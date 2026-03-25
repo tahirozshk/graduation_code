@@ -1,5 +1,19 @@
-import { Lecture, Resource, StudentMark, ExamRecord, QuizQuestion } from '@/types'
+import { Course, Lecture, Resource, StudentMark, ExamRecord, QuizQuestion } from '@/types'
 import { API_CONFIG } from './api-config'
+
+/**
+ * Custom fetch wrapper that checks for 403/401 unauthorized errors
+ * and redirects to login if the token is invalid/expired.
+ */
+async function fetchWith403Check(url: string, options?: RequestInit) {
+  const response = await fetch(url, options);
+  if (response.status === 403 || response.status === 401) {
+    console.warn("Unauthorized/Forbidden (403/401) intercepted. Token might be expired.");
+    // window.location.href = '/login'; // Disabled: Route does not exist yet
+    throw new Error('Authentication required');
+  }
+  return response;
+}
 
 /**
  * Service to fetch data from the Dux Backend.
@@ -8,30 +22,112 @@ import { API_CONFIG } from './api-config'
  */
 export const DuxApiService = {
   /**
-   * Input 1: Fetch Lecture List
-   * Uses Endpoint: API_CONFIG.ENDPOINTS.LECTURES
+   * Fetch user's courses
    */
-  async fetchLectureList(): Promise<Lecture[]> {
-    // console.log(`Fetching from: ${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LECTURES}`);
-    // return (await axios.get(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LECTURES}`)).data;
-    return [
-      { id: 'l1', title: 'Calculating curve', topic: 'Engineering Mathematics', date: '7 Şub 2025 14:20' },
-      { id: 'l2', title: 'nlp intro', topic: 'Computer Science', date: '19 Eyl 2025 18:08' },
-      { id: 'l3', title: 'Intro to elicitation techniques', topic: 'Requirements Engineering', date: '12 Nis 2025 09:40' },
-      { id: 'l4', title: 'Introduction', topic: 'General Knowledge', date: '10 Şub 2025 10:00' }
-    ]
+  async fetchMyCourses(): Promise<Course[]> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSES_MY}`;
+      const res = await fetchWith403Check(url, {
+        headers: API_CONFIG.DEFAULT_HEADERS
+      });
+      if (!res.ok) throw new Error('Failed to fetch courses');
+      const data = await res.json();
+      const courses = data.course || [];
+      return courses.map((c: any) => ({
+        id: c.courseId,
+        title: c.courseTitle,
+        ...c
+      }));
+    } catch (error) {
+      console.warn('API Failure (fetchMyCourses), using local fallback...');
+      return [
+        { id: 'c1', title: 'Introduction to University Mathematics', code: 'MTH101', image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=800&auto=format&fit=crop' },
+        { id: 'c2', title: 'KIBRIS TARIH', code: 'TRH121', image: 'https://images.unsplash.com/photo-1523050853063-8806af9e1725?q=80&w=800&auto=format&fit=crop' }
+      ] as any[];
+    }
   },
 
   /**
-   * Input 2: Fetch Lecture Resources
-   * Uses Endpoint: API_CONFIG.ENDPOINTS.RESOURCES
+   * Fetch lectures for a specific course
+   */
+  async fetchCourseLectures(courseId: string | number): Promise<Lecture[]> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LECTURES.replace(':courseId', String(courseId))}`;
+      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      if (!res.ok) throw new Error('Failed to fetch lectures');
+      const data = await res.json();
+      const lectures = data.lectures || [];
+      return lectures.map((l: any) => ({
+        id: l.lectureId,
+        title: l.title,
+        topic: l.title, // Using title as topic if topic is missing
+        date: l.startsAt ? new Date(l.startsAt).toLocaleDateString() : 'N/A',
+        ...l
+      }));
+    } catch (error) {
+      console.warn('API Failure (fetchCourseLectures), using local fallback...');
+      return [
+        { id: 'l1', title: 'I: Limits and Continuity (Word Problems)', topic: 'Introduction to University Mathematics', date: new Date().toLocaleDateString() },
+        { id: 'l2', title: 'II: Calculating Curve Area (Math Focus)', topic: 'Introduction to University Mathematics', date: new Date().toLocaleDateString() },
+        { id: 'l1785', title: 'KIBRIS TARIH: Genel Bakis', topic: 'KIBRIS TARIH', date: new Date().toLocaleDateString() }
+      ] as any[];
+    }
+  },
+
+  /**
+   * Fetch Lecture Resources
    */
   async fetchLectureResources(lectureId: string): Promise<Resource[]> {
-    // console.log(`Fetching from: ${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RESOURCES.replace(':id', lectureId)}`);
-    return [
-      { id: 'r1', lectureId, type: 'pdf', title: 'Section 4.2 - Integration & Area', url: '/files/lecture4-2.pdf' },
-      { id: 'r2', lectureId, type: 'slide', title: 'Calculations Slide 12', url: '/slides/s12.jpg' }
-    ]
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RESOURCES.replace(':lectureId', lectureId)}`;
+      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      if (!res.ok) throw new Error('Failed to fetch resources');
+      const data = await res.json();
+      const resources = data.resources || [];
+      return resources.map((r: any) => ({
+        id: r.resourceId,
+        title: r.title,
+        url: r.value ? `${API_CONFIG.BASE_URL}/uploads/${r.value.replace('uploads/', '')}` : '#',
+        ...r
+      }));
+    } catch (error) {
+      console.warn('API Failure (fetchLectureResources), using local fallback...');
+      return [
+        { id: 'r1', lectureId: lectureId, type: 'pdf', title: 'Lecture Notes (Static Fallback).pdf', url: '#' },
+        { id: 'r2', lectureId: lectureId, type: 'slide', title: 'Presentation Slides.pdf', url: '#' }
+      ] as any[];
+    }
+  },
+
+  /**
+   * Fetch a specific student submission by ID
+   */
+  async fetchStudentSubmission(submissionId: string | number): Promise<any> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SUBMISSIONS.replace(':submissionId', String(submissionId))}`;
+      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      if (!res.ok) throw new Error('Failed to fetch submission');
+      return await res.json();
+    } catch (error) {
+      console.error('Error fetching submission:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Fetch a quiz or generic file upload by file name
+   */
+  async fetchUploadContent(fileName: string): Promise<any> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPLOADS.replace(':fileName', fileName)}`;
+      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      if (!res.ok) throw new Error('Failed to fetch upload content');
+      // Since it's a file upload, we might need to return a Blob or string
+      return await res.blob();
+    } catch (error) {
+      console.error('Error fetching upload file:', error);
+      return null;
+    }
   },
 
   /**
@@ -72,6 +168,29 @@ export const DuxApiService = {
           difficulty: 'advanced'
         }
       ]
+    }
+  },
+
+  /**
+   * AI Coach: Analyze student's quiz performance
+   */
+  async analyzePerformance(payload: {
+    topic: string,
+    lectureId: string,
+    answers: Array<{ questionId: string, selectedOption: number, isCorrect: boolean }>,
+    resources: any[]
+  }): Promise<any> {
+    try {
+      const res = await fetch('/api/analyze-performance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Failed to analyze performance');
+      return await res.json();
+    } catch (error) {
+      console.error('Error analyzing performance:', error);
+      return null;
     }
   }
 }

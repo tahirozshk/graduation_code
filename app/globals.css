@@ -1,9 +1,10 @@
 :root {
   --primary: #6a1b2b; /* Burgundy */
-  --secondary-bg: #f9f9f9;
-  --text-dark: #333;
-  --text-muted: #666;
-  --border: #e0e0e0;
+  --bg-dark: #1E1E32;
+  --bg-darker: #151525;
+  --text-white: #ffffff;
+  --text-muted: #b0b0c0;
+  --border: rgba(255, 255, 255, 0.1);
   --white: #ffffff;
   --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
@@ -16,8 +17,8 @@
 
 body {
   font-family: var(--font-main);
-  background-color: var(--white);
-  color: var(--text-dark);
+  background-color: var(--bg-dark);
+  color: var(--text-white);
   line-height: 1.5;
 }
 
@@ -32,6 +33,7 @@ ul {
 
 h1, h2, h3, h4 {
   font-weight: 600;
+  color: var(--text-white);
 }
 
 .container {
@@ -83,7 +85,7 @@ h1, h2, h3, h4 {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: #f9f9f9;
+  background: var(--bg-dark);
 }
 
 .header {
@@ -92,12 +94,12 @@ h1, h2, h3, h4 {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-darker);
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 1px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
 }
 
 .header-left {
@@ -119,7 +121,7 @@ h1, h2, h3, h4 {
 }
 
 .menu-toggle:hover {
-  background: #fdf2f4;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .logo-placeholder {
@@ -131,7 +133,7 @@ h1, h2, h3, h4 {
 .logo-circle {
    width: 32px;
    height: 32px;
-   border: 2px solid #6a1b2b;
+   border: 2px solid var(--white);
    border-radius: 50%;
    display: flex;
    align-items: center;
@@ -141,24 +143,25 @@ h1, h2, h3, h4 {
 .logo-inner {
    width: 16px;
    height: 16px;
-   background: #6a1b2b;
+   background: var(--white);
    border-radius: 50%;
 }
 
 .univ-name {
   font-size: 9px;
   max-width: 180px;
-  color: #6a1b2b;
+  color: var(--white);
   font-weight: 800;
   text-transform: uppercase;
   line-height: 1.1;
   display: block;
+  opacity: 0.9;
 }
 
 .prof-dux {
   font-size: 18px;
   letter-spacing: 5px;
-  color: #6a1b2b;
+  color: var(--white);
   font-weight: 900;
 }
 
@@ -169,9 +172,10 @@ h1, h2, h3, h4 {
 }
 
 .header-icon {
-  color: #6a1b2b;
+  color: var(--white);
   cursor: pointer;
   transition: opacity 0.2s;
+  opacity: 0.8;
 }
 
 .lang-switcher {
@@ -179,9 +183,10 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #6a1b2b;
+  color: var(--white);
   font-weight: 600;
   cursor: pointer;
+  opacity: 0.8;
 }
 
 .profile-circle {
@@ -206,8 +211,8 @@ h1, h2, h3, h4 {
 
 .sidebar {
   width: 260px;
-  background: #fff;
-  border-right: 1px solid #f0f0f0;
+  background: var(--bg-darker);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 24px 12px;
@@ -236,8 +241,9 @@ h1, h2, h3, h4 {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #6a1b2b;
+  color: var(--text-white);
   font-weight: 700;
+  opacity: 0.7;
   min-width: 230px;
 }
 
@@ -248,7 +254,8 @@ h1, h2, h3, h4 {
 }
 
 .sidebar-item:hover {
-  background: #fdf2f4;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
 }
 
 .sidebar-item.active {
@@ -279,7 +286,7 @@ h1, h2, h3, h4 {
 .content {
   flex: 1;
   padding: 40px;
-  background: #f9f9f9;
+  background: var(--bg-dark);
 }
 
 .fab-ask-dux {

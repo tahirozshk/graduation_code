@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 import { 
   Home, 
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react'
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   const sidebarItems = [
@@ -70,7 +72,20 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
           <div className="sidebar-list">
             {sidebarItems.map((item, index) => (
-              <div key={index} className={`sidebar-item ${item.active ? 'active' : ''}`}>
+              <div 
+                key={index} 
+                className={`sidebar-item ${item.active ? 'active' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  if (item.label === 'My Courses' || item.label === 'Home') {
+                    router.push('/')
+                    // Force a full reload if we are already on home to ensure grid view resets
+                    if (window.location.pathname === '/') {
+                      window.location.href = '/'
+                    }
+                  }
+                }}
+              >
                 <span className="sidebar-icon">{item.icon}</span>
                 {!isCollapsed && <span className="sidebar-label">{item.label}</span>}
               </div>

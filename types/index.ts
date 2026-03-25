@@ -1,3 +1,12 @@
+export interface Course {
+  id: string;
+  title: string;
+  code?: string;
+  image?: string;
+  description?: string;
+  lectures?: Lecture[];
+}
+
 export interface Lecture {
   id: string;
   title: string;
@@ -22,12 +31,18 @@ export interface StudentMark {
 
 export interface QuizQuestion {
   id: string;
-  lectureId: string;
-  questionText: string;
+  lectureId?: string;
+  text?: string;
+  questionText?: string;
   options: string[];
   correctAnswer: number;
   explanation: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
+  visual?: {
+    type: 'formula' | 'graph' | 'image' | 'text';
+    value: string;
+    label?: string;
+  };
 }
 
 export interface ExamRecord {
@@ -45,4 +60,10 @@ export interface PracticeSession {
   lectureId: string;
   questions: QuizQuestion[];
   recommendationReason: string;
+  analysisMetadata?: {
+    lectureTitle: string;
+    resources: string[];
+    studentScore: number;
+    lastQuizzes: string[];
+  };
 }

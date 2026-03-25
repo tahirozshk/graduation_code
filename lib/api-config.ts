@@ -5,20 +5,25 @@
  */
 
 export const API_CONFIG = {
-  // Base URL for the Dux Backend microservice
-  BASE_URL: 'https://api.profdux.com/v1',
+  // Base URL for the Dux Backend (using local proxy to bypass CORS)
+  BASE_URL: '/api/proxy',
 
-  // 4 Main Inputs (Dux Image 4)
+  // Real Endpoints 
   ENDPOINTS: {
-    LECTURES: '/student/courses/lectures',       // Input 1: Lecture List
-    RESOURCES: '/lectures/:id/resources',        // Input 2: Fetch resources (PDF, Slides)
-    STUDENT_MARKS: '/student/performance/marks',  // Input 3: Fetch marks
-    PAST_PERFORMANCE: '/student/quizzes/mistakes' // Input 4: Last quizzes & exams
+    COURSES_MY: '/courses/my',                           // Fetch My Courses
+    LECTURES: '/lectures/course/:courseId',              // Fetch Course Lectures
+    RESOURCES: '/resources/lecture/:lectureId',          // Fetch Lecture Resources
+    SUBMISSIONS: '/studentSubmissions/my/:submissionId', // Fetch Student Submission
+    UPLOADS: '/uploads/:fileName',                       // Fetch Uploads/Quiz Files
+    
+    // Kept for backward compatibility if needed, though they might change
+    STUDENT_MARKS: '/student/performance/marks',  
+    PAST_PERFORMANCE: '/student/quizzes/mistakes' 
   },
 
-  // If you need specific Headers (like Auth tokens)
+  // Headers with Auth tokens
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer YOUR_TOKEN_HERE' 
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozNDU1LCJpYXQiOjE3NzQ0NjAwMTcsImV4cCI6MTc3NDQ2NzIxN30.miTs2E_e4RsU3ZBC_ZtNNy2wzQGR2Ty-70bcgVu8DVw' 
   }
 }
