@@ -8,23 +8,28 @@ import { InlineMath, BlockMath } from 'react-katex';
 
 const MathText = ({ text }: { text: string }) => {
   if (!text) return null;
-  // Fallback: If AI returns raw LaTeX without $ signs, wrap the entire string if it contains math syntax
-  let processedText = text;
-  if (!processedText.includes('$') && (processedText.includes('\\') || /[_^]/.test(processedText))) {
-    processedText = `$${processedText}$`;
+
+  // If the text contains explicit $...$ blocks (legacy or edge cases), render them with KaTeX
+  if (text.includes('$')) {
+    const parts = text.split(/(\$[^$]+\$)/g);
+    return (
+      <span>
+        {parts.map((part, i) => {
+          if (part.startsWith('$') && part.endsWith('$')) {
+            try {
+              return <InlineMath key={i} math={part.slice(1, -1)} />;
+            } catch {
+              return <span key={i}>{part.slice(1, -1)}</span>;
+            }
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
   }
-  
-  const parts = processedText.split(/(\$[^$]+\$)/g);
-  return (
-    <span>
-      {parts.map((part, i) => {
-        if (part.startsWith('$') && part.endsWith('$')) {
-          return <InlineMath key={i} math={part.slice(1, -1)} />;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </span>
-  );
+
+  // Plain text — Unicode math notation (x², √, ∫, Δ, etc.) renders natively in the browser
+  return <span>{text}</span>;
 };
 
 const QuestionVisual = ({ visual }: { visual?: QuizQuestion['visual'] }) => {
@@ -33,36 +38,97 @@ const QuestionVisual = ({ visual }: { visual?: QuizQuestion['visual'] }) => {
   switch (visual.type) {
     case 'formula':
       return (
-        <div className="math-formula">
-          <BlockMath math={visual.value} />
+        <div style={{
+          textAlign: 'center', padding: '20px 24px',
+          background: 'rgba(106, 27, 43, 0.08)', borderRadius: '14px',
+          border: '1px solid rgba(106, 27, 43, 0.2)',
+          fontSize: '18px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px'
+        }}>
+          {visual.value}
+          {visual.label && <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px', fontWeight: '400' }}>{visual.label}</div>}
         </div>
       );
-    case 'graph':
+
+    case 'graph': {
+      // Parse coordinate pairs: "50,180 100,120 150,80 200,60 ..."
+      const pairs = visual.value.trim().split(/\s+/).map(p => {
+        const [x, y] = p.split(',').map(Number);
+        return { x, y };
+      }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+
+      // If parsing failed, try treating value as raw SVG path
+      if (pairs.length < 2) {
+        return (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <svg viewBox="0 0 400 200" style={{ maxWidth: '420px', width: '100%', height: 'auto' }}>
+              <path d="M 50 100 L 350 100" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+              <path d="M 200 20 L 200 180" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+              <path d={visual.value} fill="none" stroke="#6a1b2b" strokeWidth="2.5" />
+              {visual.label && <text x="200" y="195" textAnchor="middle" fontSize="11" fill="#888">{visual.label}</text>}
+            </svg>
+          </div>
+        );
+      }
+
+      // Build polyline from data points
+      const polylinePoints = pairs.map(p => `${p.x},${p.y}`).join(' ');
+      // Build area fill (close path at bottom)
+      const areaPath = `M ${pairs[0].x},180 ` + pairs.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${pairs[pairs.length - 1].x},180 Z`;
+
       return (
-        <div className="math-graph-dynamic" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <svg viewBox="0 0 400 200" style={{ maxWidth: '400px', width: '100%', height: 'auto' }}>
-            <path d="M 50 100 L 350 100" stroke="#eee" strokeWidth="1" />
-            <path d="M 200 20 L 200 180" stroke="#eee" strokeWidth="1" />
-            <path d={visual.value} fill="none" stroke="#6a1b2b" strokeWidth="2.5" />
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0' }}>
+          <svg viewBox="0 0 400 210" style={{ maxWidth: '440px', width: '100%', height: 'auto' }}>
+            <defs>
+              <linearGradient id="graphFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#6a1b2b" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#6a1b2b" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+
+            {/* Grid lines */}
+            {[20, 60, 100, 140, 180].map(y => (
+              <line key={`h${y}`} x1="50" y1={y} x2="350" y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+            ))}
+            {[50, 100, 150, 200, 250, 300, 350].map(x => (
+              <line key={`v${x}`} x1={x} y1="20" x2={x} y2="180" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+            ))}
+
+            {/* Axes */}
+            <line x1="50" y1="180" x2="350" y2="180" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+            <line x1="50" y1="20" x2="50" y2="180" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+
+            {/* Gradient fill under curve */}
+            <path d={areaPath} fill="url(#graphFill)" />
+
+            {/* Curve line */}
+            <polyline points={polylinePoints} fill="none" stroke="#e8485c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Data point dots */}
+            {pairs.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="4" fill="#e8485c" stroke="#1a1a2e" strokeWidth="2" />
+            ))}
+
+            {/* Label */}
             {visual.label && (
-              <text x="200" y="195" textAnchor="middle" fontSize="12" fill="#666" style={{ fontStyle: 'italic' }}>
-                {visual.label}
-              </text>
+              <text x="200" y="205" textAnchor="middle" fontSize="12" fill="#aaa" fontStyle="italic">{visual.label}</text>
             )}
           </svg>
         </div>
       );
+    }
+
     case 'image':
       return (
-        <div className="question-image" style={{ width: '100%', textAlign: 'center' }}>
-          <img 
-            src={`https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=800&auto=format&fit=crop`} 
-            alt={visual.label || 'Question visual'} 
-            style={{ borderRadius: '16px', maxWidth: '100%', height: 'auto', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }} 
+        <div style={{ width: '100%', textAlign: 'center' }}>
+          <img
+            src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=800&auto=format&fit=crop"
+            alt={visual.label || 'Question visual'}
+            style={{ borderRadius: '16px', maxWidth: '100%', height: 'auto', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}
           />
           {visual.label && <p style={{ fontSize: '12px', color: '#888', marginTop: '12px' }}>{visual.label}</p>}
         </div>
       );
+
     default:
       return null;
   }
@@ -78,6 +144,11 @@ export default function PracticePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [mounted, setMounted] = useState(false)
+
+  // ── Deterministic score: (correct / total) × 100, rounded ──────────────
+  const totalQuestions = session?.questions?.length || 0;
+  const correctCount = answers.filter(a => a.isCorrect).length;
+  const calculatedScore = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
   useEffect(() => {
     setMounted(true)
@@ -103,13 +174,42 @@ export default function PracticePage() {
     }
   }, [currentQuestionIndex, session, answers]);
 
-  if (!mounted || !session) {
+  // Auto-retry: if session exists but has no questions, regenerate automatically
+  useEffect(() => {
+    if (!session || !session.lectureId) return;
+    if (session.questions && session.questions.length > 0) return;
+
+    let cancelled = false;
+    const retry = async (attempt: number) => {
+      if (cancelled || attempt > 3) return;
+      try {
+        const { PracticeEngine } = await import('../../lib/practice-engine');
+        const newSession = await PracticeEngine.generateSession(session.lectureId);
+        if (cancelled) return;
+        if (newSession && newSession.questions && newSession.questions.length > 0) {
+          setSession(newSession);
+          PracticeStore.saveSession(newSession);
+        } else if (attempt < 3) {
+          setTimeout(() => retry(attempt + 1), 1500);
+        }
+      } catch {
+        if (!cancelled && attempt < 3) {
+          setTimeout(() => retry(attempt + 1), 2000);
+        }
+      }
+    };
+    retry(1);
+    return () => { cancelled = true; };
+  }, [session]);
+
+  // ── Loading / empty guards (after all hooks) ──────────────────────────────
+  if (!mounted || !session || !session.questions || session.questions.length === 0) {
     return (
-      <div className="practice-view" style={{ textAlign: 'center', padding: '100px' }}>
+      <div className="practice-view" style={{ textAlign: 'center', padding: '100px', color: 'white' }}>
         <div className="loader" style={{ margin: '0 auto 24px auto' }}></div>
-        <h2>Preparing Your Session...</h2>
-        <p style={{ color: '#888', marginTop: '12px' }}>Analyzing resources and generating problems.</p>
-        <button className="btn btn-outline" style={{ marginTop: '32px' }} onClick={() => window.location.href = '/'}>Back to Dashboard</button>
+        <h2>Generating Questions...</h2>
+        <p style={{ color: '#888', marginTop: '12px' }}>AI is preparing your personalized quiz. This may take a few seconds.</p>
+        <button className="btn btn-outline" style={{ marginTop: '32px' }} onClick={() => window.location.href = '/'}>← Back to Dashboard</button>
       </div>
     )
   }
@@ -183,26 +283,108 @@ export default function PracticePage() {
   }
 
   if (showSummary) {
+    // Collect wrong answers with their original question index
+    const wrongAnswerIndices = answers
+      .filter(a => !a.isCorrect)
+      .map(a => session.questions.findIndex(q => q.id === a.questionId))
+      .filter(i => i !== -1);
+
+    const wrongQuestions = wrongAnswerIndices.map(i => session.questions[i]);
+
+    // Build weak topic cards from wrong questions
+    const weakTopics = wrongQuestions.map((q, idx) => ({
+      questionNumber: wrongAnswerIndices[idx] + 1,
+      snippet: (q.text || q.questionText || '').substring(0, 100) + ((q.text || '').length > 100 ? '...' : ''),
+    }));
+
+    const scoreColor = calculatedScore >= 80 ? '#4ade80' : calculatedScore >= 50 ? '#fbbf24' : '#f87171';
+    const scoreEmoji = calculatedScore >= 80 ? '🎉' : calculatedScore >= 50 ? '💪' : '📚';
+    const scoreMessage = calculatedScore >= 80
+      ? 'Excellent! You have a strong understanding of this topic.'
+      : calculatedScore >= 50
+        ? 'Good effort! Review the topics below to strengthen your knowledge.'
+        : 'Keep practicing! Focus on the weak areas listed below.';
+
+    // Handler: go back to quiz view on the first wrong question
+    const handleReviewMistakes = () => {
+      if (wrongAnswerIndices.length > 0) {
+        setCurrentQuestionIndex(wrongAnswerIndices[0]);
+      }
+      setShowSummary(false);
+    };
+
     return (
-      <div className="practice-view summary-view" style={{ textAlign: 'center', padding: '60px 20px', animation: 'fadeIn 0.6s ease' }}>
-        <div className="card summary-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <div className="completion-icon" style={{ fontSize: '64px', marginBottom: '24px' }}>🎯</div>
-          <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>Practice Complete!</h2>
-          <div className="final-score-box" style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '32px', borderRadius: '24px', marginBottom: '32px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ fontSize: '14px', color: '#aaa', textTransform: 'uppercase', letterSpacing: '2px' }}>Your Final Score</span>
-            <div style={{ fontSize: '72px', fontWeight: '900', color: '#fff', margin: '8px 0' }}>{coachData?.score || 0}</div>
-            <div className="score-bar-container" style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '16px' }}>
-              <div style={{ height: '100%', background: '#6a1b2b', width: `${coachData?.score || 0}%`, transition: 'width 1s ease-out' }}></div>
+      <div className="practice-view summary-view" style={{ padding: '40px 20px', animation: 'fadeIn 0.6s ease' }}>
+        {/* ── Score Card ───────────────────────────────────────────── */}
+        <div className="card summary-card" style={{ maxWidth: '700px', margin: '0 auto 32px auto', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>{scoreEmoji}</div>
+          <h2 style={{ fontSize: '28px', marginBottom: '8px', color: '#fff' }}>Practice Complete!</h2>
+
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '28px', borderRadius: '20px', margin: '20px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ fontSize: '14px', color: '#aaa', textTransform: 'uppercase', letterSpacing: '2px' }}>Your Score</div>
+            <div style={{ fontSize: '64px', fontWeight: '900', color: scoreColor, margin: '4px 0' }}>{calculatedScore}</div>
+            <div style={{ fontSize: '15px', color: '#ccc' }}>
+              <span style={{ color: '#4ade80' }}>✓ {correctCount} correct</span>
+              {' · '}
+              <span style={{ color: '#f87171' }}>✗ {wrongAnswerIndices.length} wrong</span>
+              {' · '}
+              <span>{totalQuestions} total</span>
+            </div>
+            <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '16px' }}>
+              <div style={{ height: '100%', background: scoreColor, width: `${calculatedScore}%`, transition: 'width 1s ease-out' }}></div>
             </div>
           </div>
-          <p style={{ color: '#ccc', lineHeight: '1.6', marginBottom: '40px' }}>
-            {coachData?.coachMessage || "Great job completing this practice session. You're making steady progress!"}
-          </p>
-          <div className="summary-actions" style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <button className="btn btn-outline" onClick={() => window.location.href = '/'}>Back to Dashboard</button>
+
+          <p style={{ color: '#ccc', lineHeight: '1.6', margin: '0 0 24px 0' }}>{scoreMessage}</p>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="btn" onClick={() => window.location.href = '/'} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: '700', letterSpacing: '0.5px' }}>← Back to Dashboard</button>
+            {wrongAnswerIndices.length > 0 && (
+              <button className="btn btn-outline" onClick={handleReviewMistakes} style={{ borderColor: '#f87171', color: '#f87171' }}>
+                🔍 Review Mistakes
+              </button>
+            )}
             <button className="btn btn-primary highlighted" onClick={handleTryAgain}>Try Again</button>
           </div>
         </div>
+
+        {/* ── Weak Topics ─────────────────────────────────────────── */}
+        {weakTopics.length > 0 && (
+          <div className="card" style={{ maxWidth: '700px', margin: '0 auto' }}>
+            <h3 style={{ color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>📊</span> Areas to Improve
+            </h3>
+            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '16px' }}>
+              Based on your wrong answers, focus on these topics:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {weakTopics.map((wt, idx) => (
+                <div key={idx} style={{
+                  background: 'rgba(248, 113, 113, 0.08)',
+                  border: '1px solid rgba(248, 113, 113, 0.2)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                }}>
+                  <div style={{ color: '#f87171', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                    ⚠ Question {wt.questionNumber}
+                  </div>
+                  <div style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5' }}>
+                    {wt.snippet}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── All Correct ──────────────────────────────────────────── */}
+        {wrongAnswerIndices.length === 0 && (
+          <div className="card" style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
+            <h3 style={{ color: '#4ade80', marginBottom: '8px' }}>Perfect Score!</h3>
+            <p style={{ color: '#aaa', fontSize: '14px' }}>You answered every question correctly. Outstanding work!</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -213,7 +395,7 @@ export default function PracticePage() {
         <div className="title-info">
           <h2>Practice Session | <span className="topic">{session.topic}</span></h2>
           <div className="stats">
-             <span>Progress: {currentQuestionIndex + 1}/{session.questions.length} Questions</span> | <span>Score: {coachData?.score || 0}</span>
+             <span>Progress: {currentQuestionIndex + 1}/{session.questions.length} Questions</span> | <span>Score: {correctCount}/{answers.length} correct</span>
           </div>
         </div>
         <div className="progress-container">

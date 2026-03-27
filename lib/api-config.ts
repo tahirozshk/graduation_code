@@ -24,6 +24,6 @@ export const API_CONFIG = {
   // Headers with Auth tokens
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozNDU1LCJpYXQiOjE3NzQ0NjAwMTcsImV4cCI6MTc3NDQ2NzIxN30.miTs2E_e4RsU3ZBC_ZtNNy2wzQGR2Ty-70bcgVu8DVw' 
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozNDU1LCJpYXQiOjE3NzQ2MzczODEsImV4cCI6MTc3NDY0NDU4MX0.FfXbXdiZ4_rU-kF3XnK-B93qeflu0h0Q2gwTv3IZfKc' 
   }
 }

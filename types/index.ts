@@ -1,7 +1,9 @@
 export interface Course {
   id: string;
   title: string;
+  name?: string;
   code?: string;
+  courseCode?: string;
   image?: string;
   description?: string;
   lectures?: Lecture[];
@@ -58,6 +60,8 @@ export interface ExamRecord {
 export interface PracticeSession {
   topic: string;
   lectureId: string;
+  courseName?: string;
+  courseCode?: string;
   questions: QuizQuestion[];
   recommendationReason: string;
   analysisMetadata?: {
@@ -66,4 +70,5 @@ export interface PracticeSession {
     studentScore: number;
     lastQuizzes: string[];
   };
+  _regenerateContext?: any;
 }
