@@ -14,6 +14,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Ensure the path exists even when the repo has no public assets
+RUN mkdir -p /app/public
 
 # Environment variables must be present at build time for some Next.js features
 # If you have public env vars, you can add them here

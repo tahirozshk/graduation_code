@@ -5,6 +5,13 @@ import React, { useState, useEffect } from 'react'
 import { DuxApiService } from '../lib/api-service'
 import { PracticeEngine } from '../lib/practice-engine'
 import { PracticeStore } from '../lib/store'
+import {
+  getStoredAccessToken,
+  getStoredSelectedCourseId,
+  isAllowedParentOrigin,
+  isPracticeBridgePayload,
+  storeBridgePayload,
+} from '../lib/auth-bridge'
 import { Course, Lecture } from '@/types'
 
 export default function CoursePage() {
@@ -17,19 +24,89 @@ export default function CoursePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [lectureResources, setLectureResources] = useState<Record<string, any[]>>({})
+  const [hasAccessToken, setHasAccessToken] = useState(false)
+  const [authMessage, setAuthMessage] = useState('Waiting for dashboard authorization...')
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     setMounted(true)
+
+    const existingAccessToken = getStoredAccessToken()
+    if (existingAccessToken) {
+      setHasAccessToken(true)
+      setAuthMessage('')
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (!isAllowedParentOrigin(event.origin)) {
+        return
+      }
+
+      if (!isPracticeBridgePayload(event.data)) {
+        return
+      }
+
+      storeBridgePayload(event.data)
+      setHasAccessToken(Boolean(event.data.accessToken || getStoredAccessToken()))
+      setAuthMessage('')
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    const authWaitTimeout = window.setTimeout(() => {
+      if (!getStoredAccessToken()) {
+        setAuthMessage('Authorization was not received. Open this module from the student dashboard.')
+      }
+    }, 4000)
+
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      window.clearTimeout(authWaitTimeout)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hasAccessToken) {
+      return
+    }
+
     DuxApiService.fetchMyCourses().then(res => {
       setCourses(res)
     })
-  }, [])
+  }, [hasAccessToken])
+
+  useEffect(() => {
+    if (courses.length === 0) {
+      return
+    }
+
+    const initialCourseId = getStoredSelectedCourseId()
+    if (!initialCourseId) {
+      return
+    }
+
+    const matchingCourse = courses.find((course) => String(course.id) === String(initialCourseId))
+    if (matchingCourse) {
+      void handleCourseClick(matchingCourse)
+    }
+  }, [courses])
 
   if (!mounted) {
     return (
       <div className="loading-view" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className="loader"></div>
+      </div>
+    )
+  }
+
+  if (!hasAccessToken) {
+    return (
+      <div className="loading-view" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '32px' }}>
+        <div>
+          <div className="loader" style={{ margin: '0 auto 24px auto' }}></div>
+          <h2 style={{ color: '#fff', marginBottom: '12px' }}>Authorizing Practice Module</h2>
+          <p style={{ color: '#bdbdbd', maxWidth: '520px' }}>{authMessage}</p>
+        </div>
       </div>
     )
   }
@@ -89,7 +166,6 @@ export default function CoursePage() {
         <>
           <div className="view-header">
              <h1 className="main-title">Courses</h1>
-             <button className="btn btn-primary" style={{ backgroundColor: '#1a4731', border: 'none', borderRadius: '10px' }}>Show Instructions</button>
           </div>
           
           <div className="courses-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '32px', marginTop: '32px' }}>

@@ -1,6 +1,5 @@
 import './globals.css'
 import type { Metadata } from 'next'
-import LayoutShell from '../components/LayoutShell'
 
 export const metadata: Metadata = {
   title: 'Prof. Dux - Student Dashboard',
@@ -15,9 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning>
-        <LayoutShell>
-          {children}
-        </LayoutShell>
+        {children}
       </body>
     </html>
   )

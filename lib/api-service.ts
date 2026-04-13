@@ -1,5 +1,6 @@
 import { Course, Lecture, Resource, StudentMark, ExamRecord, QuizQuestion } from '@/types'
 import { API_CONFIG } from './api-config'
+import { getStoredAccessToken } from './auth-bridge'
 
 /**
  * Custom fetch wrapper that checks for 403/401 unauthorized errors
@@ -27,8 +28,9 @@ export const DuxApiService = {
   async fetchMyCourses(): Promise<Course[]> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSES_MY}`;
+      const accessToken = getStoredAccessToken();
       const res = await fetchWith403Check(url, {
-        headers: API_CONFIG.DEFAULT_HEADERS
+        headers: API_CONFIG.getDefaultHeaders(accessToken)
       });
       if (!res.ok) throw new Error('Failed to fetch courses');
       const data = await res.json();
@@ -53,7 +55,9 @@ export const DuxApiService = {
   async fetchCourseLectures(courseId: string | number): Promise<Lecture[]> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LECTURES.replace(':courseId', String(courseId))}`;
-      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      const res = await fetchWith403Check(url, {
+        headers: API_CONFIG.getDefaultHeaders(getStoredAccessToken()),
+      });
       if (!res.ok) throw new Error('Failed to fetch lectures');
       const data = await res.json();
       const lectures = data.lectures || [];
@@ -80,7 +84,9 @@ export const DuxApiService = {
   async fetchLectureResources(lectureId: string): Promise<Resource[]> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RESOURCES.replace(':lectureId', lectureId)}`;
-      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      const res = await fetchWith403Check(url, {
+        headers: API_CONFIG.getDefaultHeaders(getStoredAccessToken()),
+      });
       if (!res.ok) throw new Error('Failed to fetch resources');
       const data = await res.json();
       const resources = data.resources || [];
@@ -105,7 +111,9 @@ export const DuxApiService = {
   async fetchStudentSubmission(submissionId: string | number): Promise<any> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SUBMISSIONS.replace(':submissionId', String(submissionId))}`;
-      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      const res = await fetchWith403Check(url, {
+        headers: API_CONFIG.getDefaultHeaders(getStoredAccessToken()),
+      });
       if (!res.ok) throw new Error('Failed to fetch submission');
       return await res.json();
     } catch (error) {
@@ -120,7 +128,9 @@ export const DuxApiService = {
   async fetchUploadContent(fileName: string): Promise<any> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPLOADS.replace(':fileName', fileName)}`;
-      const res = await fetchWith403Check(url, { headers: API_CONFIG.DEFAULT_HEADERS });
+      const res = await fetchWith403Check(url, {
+        headers: API_CONFIG.getDefaultHeaders(getStoredAccessToken()),
+      });
       if (!res.ok) throw new Error('Failed to fetch upload content');
       // Since it's a file upload, we might need to return a Blob or string
       return await res.blob();

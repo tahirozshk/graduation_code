@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build",
-    "start": "next start",
+    "dev": "PORT=7605 next dev --webpack",
+    "build": "PORT=7605 next build",
+    "start": "PORT=7605 next start",
     "lint": "next lint"
   },
   "keywords": [],
