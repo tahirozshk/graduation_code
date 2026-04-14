@@ -16,6 +16,7 @@ import { Course, Lecture } from '@/types'
 
 export default function CoursePage() {
   const [view, setView] = useState<'grid' | 'detail'>('grid')
+  const [language, setLanguage] = useState<'en' | 'tr'>('en')
   const [courses, setCourses] = useState<Course[]>([])
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [lectures, setLectures] = useState<Lecture[]>([])
@@ -26,6 +27,64 @@ export default function CoursePage() {
   const [lectureResources, setLectureResources] = useState<Record<string, any[]>>({})
   const [hasAccessToken, setHasAccessToken] = useState(false)
   const [authMessage, setAuthMessage] = useState('Waiting for dashboard authorization...')
+  const ui = {
+    en: {
+      courses: 'Courses',
+      back: 'Back',
+      authorizingTitle: 'Authorizing Practice Module',
+      authWaiting: 'Waiting for dashboard authorization...',
+      authMissing: 'Authorization was not received. Open this module from the student dashboard.',
+      authError: 'AI coach is busy right now or timed out while preparing 10 questions. Please try again.',
+      courseInformation: 'Course Information',
+      lectures: 'Lectures',
+      practice: 'Practice',
+      practiceTopic: 'Practice this topic',
+      noResources: 'No resources available for this lecture.',
+      resourceFile: 'Resource File',
+      recommendationTitle: 'Smart Practice Recommendation',
+      analyzing: 'AI is analyzing your performance...',
+      recommendationFallback: 'We analyzed your performance and generated a custom practice set for you.',
+      lectureList: 'Lecture List',
+      lectureResources: 'Lecture Resources',
+      studentMarks: 'Student Marks',
+      lastQuizzes: 'Last Quizzes/Exams',
+      confirmed: 'Confirmed',
+      fetched: 'Fetched',
+      analyzed: 'Analyzed',
+      referenced: 'Referenced',
+      startSession: 'Start Practice Session',
+      pdfLabel: 'PDFs',
+      languageToggle: 'Türkçe',
+    },
+    tr: {
+      courses: 'Dersler',
+      back: 'Geri',
+      authorizingTitle: 'Alıştırma Modülü Yetkilendiriliyor',
+      authWaiting: 'Panel yetkilendirmesi bekleniyor...',
+      authMissing: 'Yetkilendirme alınamadı. Bu modülü öğrenci panelinden açın.',
+      authError: 'AI koçu şu an biraz meşgul veya 10 soruyu hazırlarken zaman aşımına uğradı. Lütfen tekrar deneyin.',
+      courseInformation: 'Ders Bilgileri',
+      lectures: 'Dersler',
+      practice: 'Pratik Yap',
+      practiceTopic: 'Bu konuda pratik yap',
+      noResources: 'Bu ders için mevcut kaynak yok.',
+      resourceFile: 'Kaynak Dosyası',
+      recommendationTitle: 'Akıllı Alıştırma Önerisi',
+      analyzing: 'Yapay zeka performansınızı analiz ediyor...',
+      recommendationFallback: 'Performansınızı analiz ettik ve size özel bir alıştırma seti oluşturduk.',
+      lectureList: 'Ders Listesi',
+      lectureResources: 'Ders Kaynakları',
+      studentMarks: 'Öğrenci Notları',
+      lastQuizzes: 'Son Quizler/Sınavlar',
+      confirmed: 'Onaylandı',
+      fetched: 'Getirildi',
+      analyzed: 'Analiz Edildi',
+      referenced: 'Referans Alındı',
+      startSession: 'Alıştırma Oturumunu Başlat',
+      pdfLabel: 'PDF',
+      languageToggle: 'English',
+    },
+  }[language]
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
@@ -55,7 +114,7 @@ export default function CoursePage() {
 
     const authWaitTimeout = window.setTimeout(() => {
       if (!getStoredAccessToken()) {
-        setAuthMessage('Authorization was not received. Open this module from the student dashboard.')
+        setAuthMessage(ui.authMissing)
       }
     }, 4000)
 
@@ -63,7 +122,13 @@ export default function CoursePage() {
       window.removeEventListener('message', handleMessage)
       window.clearTimeout(authWaitTimeout)
     }
-  }, [])
+  }, [ui.authMissing])
+
+  useEffect(() => {
+    if (!hasAccessToken && !getStoredAccessToken()) {
+      setAuthMessage(ui.authWaiting)
+    }
+  }, [hasAccessToken, ui.authWaiting])
 
   useEffect(() => {
     if (!hasAccessToken) {
@@ -104,7 +169,7 @@ export default function CoursePage() {
       <div className="loading-view" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '32px' }}>
         <div>
           <div className="loader" style={{ margin: '0 auto 24px auto' }}></div>
-          <h2 style={{ color: '#fff', marginBottom: '12px' }}>Authorizing Practice Module</h2>
+          <h2 style={{ color: '#fff', marginBottom: '12px' }}>{ui.authorizingTitle}</h2>
           <p style={{ color: '#bdbdbd', maxWidth: '520px' }}>{authMessage}</p>
         </div>
       </div>
@@ -137,7 +202,7 @@ export default function CoursePage() {
       PracticeStore.saveSession(result)
     } catch (e) {
       console.error("Practice generation failed:", e)
-      alert("AI koçu şu an biraz meşgul veya 10 soruyu hazırlarken zaman aşımına uğradı. Lütfen tekrar deneyin.")
+      alert(ui.authError)
       setShowModal(false)
     } finally {
       setIsAnalyzing(false)
@@ -161,11 +226,15 @@ export default function CoursePage() {
   }
 
   return (
-    <div className={view === 'grid' ? 'course-grid-view' : 'course-view'} style={{ animation: 'fadeIn 0.5s ease' }}>
+    <div className="practice-page-shell">
+      <div className={view === 'grid' ? 'course-grid-view' : 'course-view'} style={{ animation: 'fadeIn 0.5s ease' }}>
       {view === 'grid' ? (
         <>
           <div className="view-header">
-             <h1 className="main-title">Courses</h1>
+             <h1 className="main-title">{ui.courses}</h1>
+             <button className="btn lang-toggle-btn" onClick={() => setLanguage(language === 'en' ? 'tr' : 'en')}>
+               {ui.languageToggle}
+             </button>
           </div>
           
           <div className="courses-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '32px', marginTop: '32px' }}>
@@ -190,9 +259,15 @@ export default function CoursePage() {
           </div>
           
           <style dangerouslySetInnerHTML={{ __html: `
+            .practice-page-shell {
+              width: min(1240px, calc(100vw - 32px));
+              margin: 0 auto;
+              padding: 28px 0 48px;
+            }
             .course-grid-view { animation: fadeIn 0.6s ease; }
             .main-title { font-size: 36px; color: #fff; font-weight: 800; }
             .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+            .lang-toggle-btn { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
             .course-card:hover { transform: translateY(-12px) scale(1.02); }
             @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
           ` }} />
@@ -201,12 +276,10 @@ export default function CoursePage() {
         <>
           <div className="top-actions">
             <div className="actions-left">
-              <button className="btn btn-primary" onClick={() => setView('grid')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}>Back</button>
-              <button className="btn btn-primary" style={{ background: '#6a1b2b', border: 'none' }}>View Course Exams</button>
+              <button className="btn btn-primary" onClick={() => setView('grid')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}>{ui.back}</button>
             </div>
-            <button className="btn btn-practice-more" onClick={() => handlePracticeClick(undefined, selectedCourse?.id)}>
-              Practice More
-              <span className="sparkle-icon">✨</span>
+            <button className="btn lang-toggle-btn" onClick={() => setLanguage(language === 'en' ? 'tr' : 'en')}>
+              {ui.languageToggle}
             </button>
           </div>
 
@@ -214,19 +287,14 @@ export default function CoursePage() {
             <h2 className="course-title" style={{ color: '#fff', fontSize: '40px', fontWeight: '800' }}>{selectedCourse?.title} ({selectedCourse?.id.toString().includes('math') ? 'mth101' : 'trh121'})</h2>
           </div>
 
-          <div className="section-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', padding: '24px', borderRadius: '16px' }}>
-            <h3 className="section-title" style={{ color: '#fff' }}>Submissions</h3>
-            <p className="section-text text-muted">No submissions for this course yet</p>
-          </div>
-
           <div className="info-card">
              <div className="info-icon">ℹ️</div>
-             <span className="info-label">Course Information</span>
+             <span className="info-label">{ui.courseInformation}</span>
           </div>
 
           <div className="lectures-section">
             <div className="lectures-header">
-              <h3 className="section-title">Lectures</h3>
+              <h3 className="section-title">{ui.lectures}</h3>
               <span className="badge">{lectures.length}</span>
             </div>
 
@@ -242,7 +310,7 @@ export default function CoursePage() {
                       <span className="lecture-title">{lecture.title}</span>
                     </div>
                     <div className="lecture-right" style={{ display: 'flex', alignItems: 'center' }}>
-                      <button className="btn-practice-sub" onClick={(e) => { e.stopPropagation(); handlePracticeClick(lecture.id, selectedCourse?.id); }}>Practice</button>
+                      <button className="btn-practice-sub" onClick={(e) => { e.stopPropagation(); handlePracticeClick(lecture.id, selectedCourse?.id); }}>{ui.practice}</button>
                       <span className="lecture-date">{lecture.date}</span>
                     </div>
                   </div>
@@ -254,16 +322,16 @@ export default function CoursePage() {
                           {lectureResources[lecture.id].map((r: any, idx: number) => (
                             <li key={idx} className="content-text" style={{ marginBottom: '8px' }}>
                               📄 <a href={r.url || '#'} target="_blank" rel="noreferrer" style={{ color: '#6a1b2b', textDecoration: 'none', fontWeight: 500 }}>
-                                {r.title || r.name || 'Resource File'}
+                                {r.title || r.name || ui.resourceFile}
                               </a>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="content-text">No resources available for this lecture.</p>
+                        <p className="content-text">{ui.noResources}</p>
                       )}
                       <div className="empty-state" style={{ marginTop: '12px' }}>
-                        <button className="btn-empty" onClick={() => handlePracticeClick(lecture.id)}>Practice this topic</button>
+                        <button className="btn-empty" onClick={() => handlePracticeClick(lecture.id)}>{ui.practiceTopic}</button>
                       </div>
                     </div>
                   )}
@@ -280,54 +348,54 @@ export default function CoursePage() {
             <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
             <div className="modal-header">
               <span className="ai-icon">🤖</span>
-              <h3>Smart Practice Recommendation</h3>
+              <h3>{ui.recommendationTitle}</h3>
             </div>
             <div className="modal-body">
               {isAnalyzing ? (
                 <div className="analysis-status">
                   <div className="loader"></div>
-                  <p>AI is analyzing your performance...</p>
+                  <p>{ui.analyzing}</p>
                 </div>
               ) : (
                 <>
                   <p className="recommendation-text">
-                    {session?.recommendationReason || "We analyzed your performance and generated a custom practice set for you."}
+                    {session?.recommendationReason || ui.recommendationFallback}
                   </p>
                   <div className="analysis-grid">
                     <div className="analysis-item confirmed">
                       <span className="item-icon">📖</span>
                       <div className="item-info">
-                        <strong>1. Lecture List</strong>
-                        <small>{session?.analysisMetadata?.lectureTitle || 'Confirmed'}</small>
+                        <strong>1. {ui.lectureList}</strong>
+                        <small>{session?.analysisMetadata?.lectureTitle || ui.confirmed}</small>
                       </div>
                     </div>
                     <div className="analysis-item fetched">
                       <span className="item-icon">📚</span>
                       <div className="item-info">
-                        <strong>2. Lecture Resources</strong>
+                        <strong>2. {ui.lectureResources}</strong>
                         <small title={session?.analysisMetadata?.resources?.join(', ')}>
                           {session?.analysisMetadata?.resources?.length > 0 
-                            ? `${session.analysisMetadata.resources.length} PDFs: ${session.analysisMetadata.resources[0]}${session.analysisMetadata.resources.length > 1 ? '...' : ''}` 
-                            : 'Fetched'}
+                            ? `${session.analysisMetadata.resources.length} ${ui.pdfLabel}: ${session.analysisMetadata.resources[0]}${session.analysisMetadata.resources.length > 1 ? '...' : ''}` 
+                            : ui.fetched}
                         </small>
                       </div>
                     </div>
                     <div className="analysis-item analyzed">
                       <span className="item-icon">👥</span>
                       <div className="item-info">
-                        <strong>3. Student Marks</strong>
-                        <small>{session?.analysisMetadata?.studentScore !== undefined ? `${session.analysisMetadata.studentScore}/100 Marks` : 'Analyzed'}</small>
+                        <strong>3. {ui.studentMarks}</strong>
+                        <small>{session?.analysisMetadata?.studentScore !== undefined ? `${session.analysisMetadata.studentScore}/100` : ui.analyzed}</small>
                       </div>
                     </div>
                     <div className="analysis-item referenced">
                       <span className="item-icon">📄</span>
                       <div className="item-info">
-                        <strong>4. Last Quizzes/Exams</strong>
-                        <small>{session?.analysisMetadata?.lastQuizzes?.length > 0 ? session.analysisMetadata.lastQuizzes.join(', ') : 'Referenced'}</small>
+                        <strong>4. {ui.lastQuizzes}</strong>
+                        <small>{session?.analysisMetadata?.lastQuizzes?.length > 0 ? session.analysisMetadata.lastQuizzes.join(', ') : ui.referenced}</small>
                       </div>
                     </div>
                   </div>
-                  <button className="btn-start-session" onClick={() => window.location.href = '/practice'}>Start Practice Session</button>
+                  <button className="btn-start-session" onClick={() => window.location.href = '/practice'}>{ui.startSession}</button>
                 </>
               )}
             </div>
@@ -336,12 +404,15 @@ export default function CoursePage() {
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
+        .practice-page-shell {
+          width: min(1240px, calc(100vw - 32px));
+          margin: 0 auto;
+          padding: 28px 0 48px;
+        }
         .course-view { display: flex; flex-direction: column; gap: 24px; }
-        .top-actions { display: flex; justify-content: space-between; align-items: center; }
+        .top-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
         .actions-left { display: flex; gap: 16px; }
-        .btn-practice-more { background-color: #6a1b2b; color: white; padding: 10px 24px; border-radius: 24px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(106, 27, 43, 0.2); transition: all 0.3s ease; }
-        .btn-practice-more:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(106, 27, 43, 0.3); }
-        .sparkle-icon { font-size: 16px; }
+        .lang-toggle-btn { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
         .btn-practice-sub { background: #fff; border: 1px solid #6a1b2b; color: #6a1b2b; padding: 4px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; margin-right: 16px; transition: all 0.2s; }
         .btn-practice-sub:hover { background: #6a1b2b; color: #fff; }
         .btn-empty { background: #6a1b2b; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
@@ -352,14 +423,14 @@ export default function CoursePage() {
         .modal-close { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
         .modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
         .ai-icon { font-size: 28px; }
-        .modal-header h3 { font-size: 22px; color: #fff; }
-        .recommendation-text { color: #ccc; line-height: 1.6; margin-bottom: 32px; }
+        .modal-header h3 { font-size: 22px; color: #1f1f2b; }
+        .recommendation-text { color: #4b5563; line-height: 1.6; margin-bottom: 32px; }
         .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
-        .analysis-item { background: rgba(255, 255, 255, 0.05); padding: 16px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .analysis-item { background: #f7f4f5; padding: 16px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(106, 27, 43, 0.1); }
         .item-icon { font-size: 20px; width: 40px; height: 40px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .item-info { display: flex; flex-direction: column; overflow: hidden; }
-        .item-info strong { font-size: 14px; color: #fff; }
-        .item-info small { font-size: 11px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .item-info strong { font-size: 14px; color: #1f1f2b; }
+        .item-info small { font-size: 11px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
         .btn-start-session { width: 100%; background: #6a1b2b; color: white; padding: 16px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 8px 24px rgba(106, 27, 43, 0.3); }
         .btn-start-session:hover { background: #7a1f31; transform: translateY(-2px); }
         .analysis-status { text-align: center; padding: 40px 0; }
@@ -438,7 +509,69 @@ export default function CoursePage() {
           font-size: 14px;
         }
 .text-muted { color: #888; }
+        @media (max-width: 900px) {
+          .practice-page-shell {
+            width: min(100vw - 24px, 100%);
+            padding: 20px 0 40px;
+          }
+          .top-actions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .actions-left {
+            flex-wrap: wrap;
+          }
+          .lang-toggle-btn {
+            width: 100%;
+          }
+          .courses-grid {
+            gap: 20px !important;
+            margin-top: 24px !important;
+          }
+          .course-card {
+            height: 320px !important;
+          }
+          .lecture-row {
+            padding: 14px 18px;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .lecture-right {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+          }
+          .lecture-content {
+            padding: 18px 20px;
+          }
+        }
+        @media (max-width: 640px) {
+          .practice-page-shell {
+            width: min(100vw - 16px, 100%);
+            padding: 16px 0 32px;
+          }
+          .view-header {
+            margin-bottom: 16px;
+          }
+          .main-title {
+            font-size: 30px;
+          }
+          .course-header {
+            margin-top: 20px !important;
+          }
+          .course-title {
+            font-size: 28px !important;
+          }
+          .info-card,
+          .section-card {
+            padding: 16px 18px !important;
+          }
+          .card-overlay {
+            padding: 36px 22px 24px !important;
+          }
+        }
       ` }} />
+      </div>
     </div>
   )
 }

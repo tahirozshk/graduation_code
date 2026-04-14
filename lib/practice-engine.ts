@@ -72,6 +72,11 @@ function sanitizeQuestions(questions: any[]): any[] {
   });
 }
 
+function normalizeCourseLanguage(language?: string | null): string {
+  const normalized = String(language || '').trim();
+  return normalized || 'English';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Core engine
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +117,7 @@ export const PracticeEngine = {
     const courseName: string =
       targetCourse?.name || targetCourse?.title || targetCourse?.code || '';
     const courseCode: string = targetCourse?.code || targetCourse?.courseCode || '';
+    const courseLanguage: string = normalizeCourseLanguage(targetCourse?.language);
 
     let lectures: any[] = [];
     if (targetCourseId) {
@@ -132,7 +138,7 @@ export const PracticeEngine = {
       { id: targetLectureId, title: 'Unknown', topic: 'Unknown' };
 
     console.log(`[PRACTICE ENGINE] Target Lecture: ${targetLecture.title} (ID: ${targetLecture.id})`);
-    console.log(`[PRACTICE ENGINE] Course: "${courseName}" (${courseCode})`);
+    console.log(`[PRACTICE ENGINE] Course: "${courseName}" (${courseCode}) | Language: ${courseLanguage}`);
 
     // ── Resources ────────────────────────────────────────────────────────────
     const resources = await DuxApiService.fetchLectureResources(targetLecture.id);
@@ -143,6 +149,7 @@ export const PracticeEngine = {
       targetLecture,
       courseName,
       courseCode,
+      courseLanguage,
       resources,
     });
 
@@ -160,11 +167,12 @@ export const PracticeEngine = {
       lectureId: targetLecture.id || 'unknown',
       courseName,
       courseCode,
+      courseLanguage,
       questions,
       recommendationReason: `Based on your recent performance in "${targetLecture.title || 'the course'}", our AI generated a custom practice set focusing on your weak points using ${resources.length} available resource${resources.length !== 1 ? 's' : ''}.`,
       analysisMetadata,
       // Store enough context to allow instant regeneration without re-fetching
-      _regenerateContext: { targetLecture, courseName, courseCode, resources },
+      _regenerateContext: { targetLecture, courseName, courseCode, courseLanguage, resources },
     };
   },
 
@@ -198,11 +206,13 @@ export const PracticeEngine = {
     targetLecture,
     courseName,
     courseCode,
+    courseLanguage,
     resources,
   }: {
     targetLecture: any;
     courseName: string;
     courseCode: string;
+    courseLanguage: string;
     resources: any[];
   }): Promise<any[]> {
     try {
@@ -212,6 +222,7 @@ export const PracticeEngine = {
         lectureId: targetLecture.id,
         courseName,                         // ← passed to route for subject detection
         courseCode,                         // ← passed to route for subject detection
+        courseLanguage,
         weakPoints: targetLecture.topic || targetLecture.title || 'Unknown',
         resources: resources.map((r: any) => ({
           title: r.title || 'Source Material',
@@ -219,7 +230,7 @@ export const PracticeEngine = {
         })),
       };
 
-      console.log(`[PRACTICE ENGINE] Calling AI Generator — topic: "${payload.topic}", course: "${courseName}"`);
+      console.log(`[PRACTICE ENGINE] Calling AI Generator — topic: "${payload.topic}", course: "${courseName}", language: "${courseLanguage}"`);
 
       const response = await fetch('/api/generate-quiz', {
         method: 'POST',

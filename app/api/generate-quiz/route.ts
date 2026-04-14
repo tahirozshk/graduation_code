@@ -18,8 +18,23 @@ interface QuizRequestBody {
   topic: string;        // lecture topic title  e.g. "Fractions, Decimals, and Percentages"
   courseName?: string;  // course name          e.g. "Math 101 (trh121)"
   courseCode?: string;  // course code          e.g. "MATH101"
+  courseLanguage?: string;
   resources?: unknown;
   weakPoints?: string;
+}
+
+interface GeneratedQuestion {
+  id: string;
+  text: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  visual?: {
+    type: 'formula' | 'graph' | 'image' | 'text';
+    value: string;
+    label?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +112,27 @@ function detectSubject(topic: string, courseName = '', courseCode = ''): Subject
   return 'default';
 }
 
+function normalizeOutputLanguage(courseLanguage = ''): string {
+  const normalized = courseLanguage.toLowerCase().trim();
+  if (!normalized) return 'English';
+  if (normalized.includes('türk') || normalized.includes('turk')) return 'Turkish';
+  if (normalized.includes('english') || normalized.includes('ingiliz')) return 'English';
+  if (normalized.includes('arab')) return 'Arabic';
+  if (normalized.includes('persian') || normalized.includes('fars')) return 'Persian';
+  if (normalized.includes('russian') || normalized.includes('rus')) return 'Russian';
+  if (normalized.includes('german') || normalized.includes('alm')) return 'German';
+  return courseLanguage;
+}
+
+function buildLanguageInstruction(courseLanguage: string): string {
+  const outputLanguage = normalizeOutputLanguage(courseLanguage);
+  return `
+LANGUAGE REQUIREMENT:
+- All question stems, options, explanations, and reading passages must be entirely in ${outputLanguage}.
+- Do not mix languages unless a proper noun or official course code requires it.
+- If the source materials are mixed-language, still produce the final quiz only in ${outputLanguage}.`.trim();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared JSON schema appended to every prompt
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,9 +140,13 @@ function detectSubject(topic: string, courseName = '', courseCode = ''): Subject
 const JSON_SCHEMA = `
 OUTPUT RULES:
 - Output ONLY valid JSON — no markdown fences, no text before or after.
+- Return EXACTLY one top-level JSON object with exactly one key: "questions".
+- Do not include comments, trailing commas, code fences, analysis, notes, or explanation outside JSON.
 - Exactly 5 questions, never truncate.
 - Every question: id, text, options (4 strings), correctAnswer (0-3), explanation, difficulty ("beginner"|"intermediate"|"advanced").
 - "visual" is optional — include when genuinely useful.
+- Every string value must be valid JSON string content with escaped quotes when needed.
+- Never leave placeholders like "[...]", "(rest omitted)", "same as above", or unfinished arrays/objects.
 
 QUESTION VARIETY:
 - At least 1 question MUST be a real-world word problem (a scenario the student can relate to).
@@ -160,9 +200,10 @@ Examples of CORRECT notation:
 //  Per-subject prompt builders
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildMathPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildMathPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level mathematics professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -179,13 +220,15 @@ RULES:
 - Difficulty spread: 1 easy (concept), 2 medium (single-step), 2 hard (multi-step or proof).
 - Explanation: full step-by-step solution using plain readable math notation.
 - Add "visual" with type "formula" for key formulas when helpful.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
 
-function buildPhysicsPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildPhysicsPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level physics professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -201,13 +244,15 @@ RULES:
 - Distractors: sign errors, wrong component decomposition, unit confusion, formula misapplication.
 - Difficulty spread: 1 conceptual (no calculation), 2 single-formula, 2 multi-step derivation.
 - Explanation: full solution with intermediate steps and unit analysis.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
 
-function buildChemistryPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildChemistryPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level chemistry professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -222,13 +267,15 @@ RULES:
 - Organic questions: reaction type, IUPAC naming, or mechanism steps.
 - Difficulty spread: 1 recall, 2 calculation/identification, 2 multi-step or mechanism.
 - Explanation: include balanced equation, mechanism, or thermodynamic derivation.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
 
-function buildBiologyPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildBiologyPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level biology professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -243,13 +290,15 @@ RULES:
 - Genetics: Punnett square, Hardy-Weinberg (p² + 2pq + q² = 1), or linkage analysis when relevant. NO LaTeX.
 - Difficulty spread: 1 terminology/recall, 2 mechanism/process, 2 application or data interpretation.
 - Explanation: describe the correct mechanism and name the specific cellular or molecular event.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
 
-function buildHistoryPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildHistoryPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level history professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -265,13 +314,15 @@ RULES:
 - Difficulty spread: 1 factual recall, 2 causal/analytical, 1 comparative, 1 primary-source interpretation.
 - Explanation: provide historical context with date range and significance.
 - DO NOT include any "visual" field with graphs or charts — this is a history course.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
 
-function buildEnglishPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildEnglishPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level English language and literature professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -288,6 +339,7 @@ RULES:
 - Difficulty spread: 1 grammar, 1 vocabulary-in-context, 2 reading comprehension, 1 advanced language use or literature.
 - Explanation: cite the grammar rule, correct word choice reasoning, or textual evidence.
 - DO NOT include any "visual" field with graphs or charts — this is a language course.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
@@ -316,9 +368,10 @@ KURALLAR:
 ${JSON_SCHEMA}`;
 }
 
-function buildDefaultPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
+function buildDefaultPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
   return `You are an expert university-level professor.
 Course: ${courseName}
+Course language: ${normalizeOutputLanguage(courseLanguage)}
 Lecture Topic: ${topic}
 Student Weaknesses: ${weakPoints}
 Resources: ${JSON.stringify(resources)}
@@ -332,6 +385,7 @@ RULES:
 - Difficulty spread: 1 recall, 2 application, 2 analysis/synthesis.
 - Explanation: clear and detailed, referencing underlying concepts.
 - DO NOT include any "visual" field with graphs — only use "visual" with type "formula" if the subject involves math or science formulas.
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
@@ -346,18 +400,19 @@ function buildPrompt(
   resources: unknown,
   courseName: string,
   courseCode: string,
+  courseLanguage: string,
 ): string {
   const subject = detectSubject(topic, courseName, courseCode);
   const wp = weakPoints || 'None provided';
   switch (subject) {
-    case 'math': return buildMathPrompt(topic, wp, resources, courseName);
-    case 'physics': return buildPhysicsPrompt(topic, wp, resources, courseName);
-    case 'chemistry': return buildChemistryPrompt(topic, wp, resources, courseName);
-    case 'biology': return buildBiologyPrompt(topic, wp, resources, courseName);
-    case 'history': return buildHistoryPrompt(topic, wp, resources, courseName);
-    case 'english': return buildEnglishPrompt(topic, wp, resources, courseName);
+    case 'math': return buildMathPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'physics': return buildPhysicsPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'chemistry': return buildChemistryPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'biology': return buildBiologyPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'history': return buildHistoryPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'english': return buildEnglishPrompt(topic, wp, resources, courseName, courseLanguage);
     case 'turkish': return buildTurkishPrompt(topic, wp, resources, courseName);
-    default: return buildDefaultPrompt(topic, wp, resources, courseName);
+    default: return buildDefaultPrompt(topic, wp, resources, courseName, courseLanguage);
   }
 }
 
@@ -365,23 +420,30 @@ function buildPrompt(
 //  Mock fallback questions (shown when GOOGLE_API_KEY is missing)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getMockQuestions(topic: string, courseName: string, courseCode: string): object[] {
+function getMockQuestions(topic: string, courseName: string, courseCode: string, courseLanguage = ''): object[] {
   const subject = detectSubject(topic, courseName, courseCode);
+  const isTurkish = normalizeOutputLanguage(courseLanguage).toLowerCase() === 'turkish';
   const mocks: Record<Subject, object[]> = {
     math: [
       {
         id: 'q1',
-        text: 'limₓ→₀ sin(3x)/x ifadesinin değeri nedir?',
-        options: ['0', '1', '3', 'Tanımsız'],
+        text: isTurkish ? 'limₓ→₀ sin(3x)/x ifadesinin değeri nedir?' : 'What is the value of limₓ→₀ sin(3x)/x?',
+        options: isTurkish ? ['0', '1', '3', 'Tanımsız'] : ['0', '1', '3', 'Undefined'],
         correctAnswer: 2,
-        explanation: 'limₓ→₀ sin(ax)/x = a kuralını kullanırsak, limit 3 olur.',
+        explanation: isTurkish
+          ? 'limₓ→₀ sin(ax)/x = a kuralını kullanırsak, limit 3 olur.'
+          : 'Using limₓ→₀ sin(ax)/x = a, the limit is 3.',
       },
       {
         id: 'q2',
-        text: 'Bir dikdörtgenin uzunluğu (2x + 3), genişliği (x − 1) ise x = 4 olduğunda alanı kaçtır?',
+        text: isTurkish
+          ? 'Bir dikdörtgenin uzunluğu (2x + 3), genişliği (x − 1) ise x = 4 olduğunda alanı kaçtır?'
+          : 'If a rectangle has length (2x + 3) and width (x − 1), what is its area when x = 4?',
         options: ['33', '11', '44', '27'],
         correctAnswer: 0,
-        explanation: 'Uzunluk = 2(4) + 3 = 11, Genişlik = 4 − 1 = 3. Alan = 11 × 3 = 33.',
+        explanation: isTurkish
+          ? 'Uzunluk = 2(4) + 3 = 11, Genişlik = 4 − 1 = 3. Alan = 11 × 3 = 33.'
+          : 'Length = 11 and width = 3, so the area is 33.',
       },
     ],
     physics: [
@@ -456,6 +518,143 @@ function getMockQuestions(topic: string, courseName: string, courseCode: string)
   return mocks[subject] ?? mocks.default;
 }
 
+function tryExtractJsonObject(raw: string): string {
+  let sanitized = raw
+    .replace(/```json\s*/ig, '')
+    .replace(/```\s*/ig, '')
+    .trim();
+
+  const firstBrace = sanitized.indexOf('{');
+  const lastBrace = sanitized.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    sanitized = sanitized.substring(firstBrace, lastBrace + 1);
+  }
+
+  return sanitized;
+}
+
+function normalizeQuestion(question: unknown, index: number): GeneratedQuestion | null {
+  if (!question || typeof question !== 'object') {
+    return null;
+  }
+
+  const candidate = question as Record<string, unknown>;
+  const text =
+    typeof candidate.text === 'string'
+      ? candidate.text
+      : typeof candidate.questionText === 'string'
+        ? candidate.questionText
+        : '';
+  const explanation =
+    typeof candidate.explanation === 'string' ? candidate.explanation : '';
+  const options = Array.isArray(candidate.options)
+    ? candidate.options.filter((item): item is string => typeof item === 'string')
+    : [];
+
+  if (!text || !explanation || options.length < 4) {
+    return null;
+  }
+
+  const normalizedOptions = options.slice(0, 4);
+  const difficulty =
+    candidate.difficulty === 'beginner' ||
+    candidate.difficulty === 'intermediate' ||
+    candidate.difficulty === 'advanced'
+      ? candidate.difficulty
+      : 'intermediate';
+
+  const rawCorrectAnswer =
+    typeof candidate.correctAnswer === 'number' ? candidate.correctAnswer : 0;
+  const correctAnswer =
+    rawCorrectAnswer >= 0 && rawCorrectAnswer < normalizedOptions.length
+      ? rawCorrectAnswer
+      : 0;
+
+  const visual =
+    candidate.visual &&
+    typeof candidate.visual === 'object' &&
+    typeof (candidate.visual as Record<string, unknown>).type === 'string' &&
+    typeof (candidate.visual as Record<string, unknown>).value === 'string'
+      ? {
+          type: (candidate.visual as Record<string, unknown>).type as GeneratedQuestion['visual']['type'],
+          value: (candidate.visual as Record<string, unknown>).value as string,
+          label:
+            typeof (candidate.visual as Record<string, unknown>).label === 'string'
+              ? ((candidate.visual as Record<string, unknown>).label as string)
+              : undefined,
+        }
+      : undefined;
+
+  return {
+    id:
+      typeof candidate.id === 'string' && candidate.id.trim().length > 0
+        ? candidate.id
+        : `q${index + 1}`,
+    text,
+    options: normalizedOptions,
+    correctAnswer,
+    explanation,
+    difficulty,
+    ...(visual ? { visual } : {}),
+  };
+}
+
+function normalizeQuestions(data: unknown): GeneratedQuestion[] {
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+
+  const questions = (data as { questions?: unknown }).questions;
+  if (!Array.isArray(questions)) {
+    return [];
+  }
+
+  return questions
+    .map((question, index) => normalizeQuestion(question, index))
+    .filter((question): question is GeneratedQuestion => Boolean(question))
+    .slice(0, 5);
+}
+
+async function repairJsonWithGemini(apiKey: string, invalidOutput: string): Promise<string | null> {
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+  const repairPrompt = `
+You are a JSON repair tool.
+Fix the following malformed JSON-like content so that it becomes valid JSON.
+
+REPAIR RULES:
+- Output ONLY valid JSON.
+- Preserve the intended meaning.
+- Return exactly one object with one key: "questions".
+- Ensure "questions" is an array of exactly 5 objects when enough data exists.
+- Remove any markdown fences, commentary, trailing commas, or broken syntax.
+
+CONTENT TO REPAIR:
+${invalidOutput}
+`.trim();
+
+  const response = await fetch(geminiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: repairPrompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        topP: 0.1,
+        maxOutputTokens: 4096,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  const text: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text ? tryExtractJsonObject(text) : null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  POST handler
 // ─────────────────────────────────────────────────────────────────────────────
@@ -467,6 +666,7 @@ export async function POST(request: Request) {
       topic,
       courseName = '',
       courseCode = '',
+      courseLanguage = '',
       resources = [],
       weakPoints = '',
     } = body;
@@ -475,15 +675,15 @@ export async function POST(request: Request) {
 
     if (!apiKey) {
       console.warn('[QUIZ] No GOOGLE_API_KEY — returning mock questions.');
-      return NextResponse.json({ questions: getMockQuestions(topic, courseName, courseCode) });
+      return NextResponse.json({ questions: getMockQuestions(topic, courseName, courseCode, courseLanguage) });
     }
 
     const detectedSubject = detectSubject(topic, courseName, courseCode);
-    const prompt = buildPrompt(topic, weakPoints, resources, courseName, courseCode);
+    const prompt = buildPrompt(topic, weakPoints, resources, courseName, courseCode, courseLanguage);
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
 
-    console.log(`[GEMINI] Subject: "${detectedSubject}" | Course: "${courseName}" | Topic: "${topic}"`);
+    console.log(`[GEMINI] Subject: "${detectedSubject}" | Course: "${courseName}" | Topic: "${topic}" | Language: "${normalizeOutputLanguage(courseLanguage)}"`);
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -514,36 +714,64 @@ export async function POST(request: Request) {
       throw new Error('Gemini API returned an empty response.');
     }
 
-    // Robust JSON extraction — handles thinking-model preambles, markdown fences, etc.
-    let sanitized = resultString
-      .replace(/```json\s*/ig, '')
-      .replace(/```\s*/ig, '')
-      .trim();
-
-    // If there's still non-JSON text, extract the JSON object by braces
-    const firstBrace = sanitized.indexOf('{');
-    const lastBrace = sanitized.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      sanitized = sanitized.substring(firstBrace, lastBrace + 1);
-    }
+    let sanitized = tryExtractJsonObject(resultString);
 
     console.log('[GEMINI PREVIEW]:', sanitized.substring(0, 200) + '...');
 
-    let data: { questions?: object[] };
+    let parsedData: unknown;
     try {
-      data = JSON.parse(sanitized);
+      parsedData = JSON.parse(sanitized);
     } catch {
       console.error('[GEMINI JSON PARSE ERROR] Raw:', resultString);
-      throw new Error('AI produced invalid JSON. Please try again.');
+      const repaired = await repairJsonWithGemini(apiKey, resultString);
+      if (!repaired) {
+        console.warn('[GEMINI REPAIR] Repair attempt failed, using fallback questions.');
+        return NextResponse.json({
+          questions: getMockQuestions(topic, courseName, courseCode, courseLanguage),
+          fallbackReason: 'invalid-json',
+        });
+      }
+
+      try {
+        parsedData = JSON.parse(repaired);
+      } catch {
+        console.warn('[GEMINI REPAIR] Repaired JSON still invalid, using fallback questions.');
+        return NextResponse.json({
+          questions: getMockQuestions(topic, courseName, courseCode, courseLanguage),
+          fallbackReason: 'repair-json-invalid',
+        });
+      }
     }
 
-    if (!data.questions || data.questions.length === 0) {
-      console.warn('[GEMINI WARNING] Zero questions — using fallback.');
-      data.questions = getMockQuestions(topic, courseName, courseCode);
+    const normalizedQuestions = normalizeQuestions(parsedData);
+
+    if (normalizedQuestions.length === 0) {
+      console.warn('[GEMINI WARNING] Zero valid normalized questions — using fallback.');
+      return NextResponse.json({
+        questions: getMockQuestions(topic, courseName, courseCode, courseLanguage),
+        fallbackReason: 'normalized-empty',
+      });
     }
 
-    console.log(`[GEMINI SUCCESS] ${data.questions.length} questions | Subject: ${detectedSubject}`);
-    return NextResponse.json(data);
+    if (normalizedQuestions.length < 5) {
+      console.warn(
+        `[GEMINI WARNING] Only ${normalizedQuestions.length} valid questions after normalization; filling with fallback.`,
+      );
+      const fallbackQuestions = getMockQuestions(topic, courseName, courseCode, courseLanguage) as GeneratedQuestion[];
+      const mergedQuestions = [...normalizedQuestions];
+      for (const fallbackQuestion of fallbackQuestions) {
+        if (mergedQuestions.length >= 5) break;
+        mergedQuestions.push(
+          normalizeQuestion(fallbackQuestion, mergedQuestions.length) ||
+            fallbackQuestion,
+        );
+      }
+
+      return NextResponse.json({ questions: mergedQuestions.slice(0, 5) });
+    }
+
+    console.log(`[GEMINI SUCCESS] ${normalizedQuestions.length} questions | Subject: ${detectedSubject}`);
+    return NextResponse.json({ questions: normalizedQuestions });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';

@@ -4,6 +4,7 @@ export interface Course {
   name?: string;
   code?: string;
   courseCode?: string;
+  language?: string;
   image?: string;
   description?: string;
   lectures?: Lecture[];
@@ -62,6 +63,7 @@ export interface PracticeSession {
   lectureId: string;
   courseName?: string;
   courseCode?: string;
+  courseLanguage?: string;
   questions: QuizQuestion[];
   recommendationReason: string;
   analysisMetadata?: {

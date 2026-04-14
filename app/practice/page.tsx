@@ -136,6 +136,7 @@ const QuestionVisual = ({ visual }: { visual?: QuizQuestion['visual'] }) => {
 
 export default function PracticePage() {
   const [session, setSession] = useState<PracticeSession | null>(null)
+  const [uiLanguage, setUiLanguage] = useState<'en' | 'tr'>('en')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
@@ -144,6 +145,59 @@ export default function PracticePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const isTurkish = uiLanguage === 'tr'
+  const ui = {
+    generatingTitle: isTurkish ? 'Sorular Hazırlanıyor...' : 'Generating Questions...',
+    generatingText: isTurkish
+      ? 'Yapay zeka size özel alıştırma sorularını hazırlıyor. Bu işlem birkaç saniye sürebilir.'
+      : 'AI is preparing your personalized quiz. This may take a few seconds.',
+    backToDashboard: isTurkish ? '← Panele Dön' : '← Back to Dashboard',
+    retryError: isTurkish
+      ? 'Yeniden deneme sırasında bir hata oluştu. Lütfen ana sayfaya dönüp tekrar deneyin.'
+      : 'An error occurred while trying again. Please return to the dashboard and try again.',
+    practiceComplete: isTurkish ? 'Alıştırma Tamamlandı!' : 'Practice Complete!',
+    yourScore: isTurkish ? 'Puanınız' : 'Your Score',
+    scoreExcellent: isTurkish
+      ? 'Harika! Bu konuda güçlü bir kavrayışa sahipsiniz.'
+      : 'Excellent! You have a strong understanding of this topic.',
+    scoreGood: isTurkish
+      ? 'İyi gidiyorsunuz! Bilginizi güçlendirmek için aşağıdaki konuları tekrar edin.'
+      : 'Good effort! Review the topics below to strengthen your knowledge.',
+    scoreLow: isTurkish
+      ? 'Pratik yapmaya devam edin! Aşağıdaki zayıf alanlara odaklanın.'
+      : 'Keep practicing! Focus on the weak areas listed below.',
+    reviewMistakes: isTurkish ? '🔍 Hataları İncele' : '🔍 Review Mistakes',
+    tryAgain: isTurkish ? 'Tekrar Dene' : 'Try Again',
+    areasToImprove: isTurkish ? 'Geliştirmeniz Gereken Alanlar' : 'Areas to Improve',
+    areasText: isTurkish
+      ? 'Yanlış cevaplarınıza göre şu konulara odaklanın:'
+      : 'Based on your wrong answers, focus on these topics:',
+    question: isTurkish ? 'Soru' : 'Question',
+    perfectScore: isTurkish ? 'Mükemmel Puan!' : 'Perfect Score!',
+    perfectScoreText: isTurkish
+      ? 'Tüm soruları doğru cevapladınız. Çok iyi iş çıkardınız!'
+      : 'You answered every question correctly. Outstanding work!',
+    practiceSession: isTurkish ? 'Alıştırma Oturumu' : 'Practice Session',
+    progress: isTurkish ? 'İlerleme' : 'Progress',
+    questions: isTurkish ? 'soru' : 'Questions',
+    score: isTurkish ? 'Skor' : 'Score',
+    correct: isTurkish ? 'doğru' : 'correct',
+    weaknessFocus: isTurkish ? 'Zayıf alanlarınıza odaklı alıştırma' : 'Practice focused on your weakness',
+    generalKnowledge: isTurkish ? 'Genel Bilgi' : 'General Knowledge',
+    checkAnswer: isTurkish ? 'Cevabı Kontrol Et' : 'Check Answer',
+    correctLabel: isTurkish ? '✓ Doğru' : '✓ Correct',
+    explanation: isTurkish ? 'Açıklama:' : 'Explanation:',
+    coach: isTurkish ? 'AI Koç' : 'AI Coach',
+    coachPlaceholder: isTurkish
+      ? 'Kişiselleştirilmiş geri bildirim almak için soruları cevaplayın!'
+      : 'Answer questions to get personalized feedback!',
+    focusedAreas: isTurkish ? 'Odak Alanları:' : 'Focused Areas:',
+    endSession: isTurkish ? 'Oturumu Bitir' : 'End Session',
+    previous: isTurkish ? 'Önceki' : 'Previous',
+    calculateScore: isTurkish ? 'Puanı Hesapla' : 'Calculate Score',
+    nextQuestion: isTurkish ? 'Sonraki Soru' : 'Next Question',
+    languageToggle: isTurkish ? 'English' : 'Türkçe',
+  }
 
   // ── Deterministic score: (correct / total) × 100, rounded ──────────────
   const totalQuestions = session?.questions?.length || 0;
@@ -155,6 +209,9 @@ export default function PracticePage() {
     const activeSession = PracticeStore.getSession()
     if (activeSession) {
       setSession(activeSession)
+      const normalizedLanguage = String(activeSession.courseLanguage || '').toLowerCase().trim()
+      const shouldUseTurkish = normalizedLanguage.includes('türk') || normalizedLanguage.includes('turk')
+      setUiLanguage(shouldUseTurkish ? 'tr' : 'en')
     }
   }, [])
 
@@ -205,11 +262,11 @@ export default function PracticePage() {
   // ── Loading / empty guards (after all hooks) ──────────────────────────────
   if (!mounted || !session || !session.questions || session.questions.length === 0) {
     return (
-      <div className="practice-view" style={{ textAlign: 'center', padding: '100px', color: 'white' }}>
+      <div className="practice-view" style={{ textAlign: 'center', padding: '64px 24px', maxWidth: '1040px', margin: '0 auto', color: 'white' }}>
         <div className="loader" style={{ margin: '0 auto 24px auto' }}></div>
-        <h2>Generating Questions...</h2>
-        <p style={{ color: '#888', marginTop: '12px' }}>AI is preparing your personalized quiz. This may take a few seconds.</p>
-        <button className="btn btn-outline" style={{ marginTop: '32px' }} onClick={() => window.location.href = '/'}>← Back to Dashboard</button>
+        <h2>{ui.generatingTitle}</h2>
+        <p style={{ color: '#888', marginTop: '12px' }}>{ui.generatingText}</p>
+        <button className="btn btn-outline" style={{ marginTop: '32px' }} onClick={() => window.location.href = '/'}>{ui.backToDashboard}</button>
       </div>
     )
   }
@@ -275,7 +332,7 @@ export default function PracticePage() {
       PracticeStore.saveSession(newSession);
     } catch (e) {
       console.error("Failed to regenerate session:", e);
-      alert("Yeniden deneme sırasında bir hata oluştu. Lütfen ana sayfaya dönüp tekrar deneyin.");
+      alert(ui.retryError);
       window.location.href = '/';
     } finally {
       setIsAnalyzing(false);
@@ -300,10 +357,10 @@ export default function PracticePage() {
     const scoreColor = calculatedScore >= 80 ? '#4ade80' : calculatedScore >= 50 ? '#fbbf24' : '#f87171';
     const scoreEmoji = calculatedScore >= 80 ? '🎉' : calculatedScore >= 50 ? '💪' : '📚';
     const scoreMessage = calculatedScore >= 80
-      ? 'Excellent! You have a strong understanding of this topic.'
+      ? ui.scoreExcellent
       : calculatedScore >= 50
-        ? 'Good effort! Review the topics below to strengthen your knowledge.'
-        : 'Keep practicing! Focus on the weak areas listed below.';
+        ? ui.scoreGood
+        : ui.scoreLow;
 
     // Handler: go back to quiz view on the first wrong question
     const handleReviewMistakes = () => {
@@ -314,17 +371,17 @@ export default function PracticePage() {
     };
 
     return (
-      <div className="practice-view summary-view" style={{ padding: '40px 20px', animation: 'fadeIn 0.6s ease' }}>
+      <div className="practice-view summary-view" style={{ padding: '32px 20px 48px', maxWidth: '1180px', margin: '0 auto', animation: 'fadeIn 0.6s ease' }}>
         {/* ── Score Card ───────────────────────────────────────────── */}
         <div className="card summary-card" style={{ maxWidth: '700px', margin: '0 auto 32px auto', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px' }}>{scoreEmoji}</div>
-          <h2 style={{ fontSize: '28px', marginBottom: '8px', color: '#fff' }}>Practice Complete!</h2>
+          <h2 style={{ fontSize: '28px', marginBottom: '8px', color: '#fff' }}>{ui.practiceComplete}</h2>
 
           <div style={{ background: 'rgba(255,255,255,0.05)', padding: '28px', borderRadius: '20px', margin: '20px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ fontSize: '14px', color: '#aaa', textTransform: 'uppercase', letterSpacing: '2px' }}>Your Score</div>
+            <div style={{ fontSize: '14px', color: '#aaa', textTransform: 'uppercase', letterSpacing: '2px' }}>{ui.yourScore}</div>
             <div style={{ fontSize: '64px', fontWeight: '900', color: scoreColor, margin: '4px 0' }}>{calculatedScore}</div>
             <div style={{ fontSize: '15px', color: '#ccc' }}>
-              <span style={{ color: '#4ade80' }}>✓ {correctCount} correct</span>
+              <span style={{ color: '#4ade80' }}>✓ {correctCount} {ui.correct}</span>
               {' · '}
               <span style={{ color: '#f87171' }}>✗ {wrongAnswerIndices.length} wrong</span>
               {' · '}
@@ -338,13 +395,13 @@ export default function PracticePage() {
           <p style={{ color: '#ccc', lineHeight: '1.6', margin: '0 0 24px 0' }}>{scoreMessage}</p>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => window.location.href = '/'} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: '700', letterSpacing: '0.5px' }}>← Back to Dashboard</button>
+            <button className="btn" onClick={() => window.location.href = '/'} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: '700', letterSpacing: '0.5px' }}>{ui.backToDashboard}</button>
             {wrongAnswerIndices.length > 0 && (
               <button className="btn btn-outline" onClick={handleReviewMistakes} style={{ borderColor: '#f87171', color: '#f87171' }}>
-                🔍 Review Mistakes
+                {ui.reviewMistakes}
               </button>
             )}
-            <button className="btn btn-primary highlighted" onClick={handleTryAgain}>Try Again</button>
+            <button className="btn btn-primary highlighted" onClick={handleTryAgain}>{ui.tryAgain}</button>
           </div>
         </div>
 
@@ -352,10 +409,10 @@ export default function PracticePage() {
         {weakTopics.length > 0 && (
           <div className="card" style={{ maxWidth: '700px', margin: '0 auto' }}>
             <h3 style={{ color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px' }}>📊</span> Areas to Improve
+              <span style={{ fontSize: '20px' }}>📊</span> {ui.areasToImprove}
             </h3>
             <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '16px' }}>
-              Based on your wrong answers, focus on these topics:
+              {ui.areasText}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {weakTopics.map((wt, idx) => (
@@ -366,7 +423,7 @@ export default function PracticePage() {
                   padding: '14px 18px',
                 }}>
                   <div style={{ color: '#f87171', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
-                    ⚠ Question {wt.questionNumber}
+                    ⚠ {ui.question} {wt.questionNumber}
                   </div>
                   <div style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5' }}>
                     {wt.snippet}
@@ -381,8 +438,8 @@ export default function PracticePage() {
         {wrongAnswerIndices.length === 0 && (
           <div className="card" style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
-            <h3 style={{ color: '#4ade80', marginBottom: '8px' }}>Perfect Score!</h3>
-            <p style={{ color: '#aaa', fontSize: '14px' }}>You answered every question correctly. Outstanding work!</p>
+            <h3 style={{ color: '#4ade80', marginBottom: '8px' }}>{ui.perfectScore}</h3>
+            <p style={{ color: '#aaa', fontSize: '14px' }}>{ui.perfectScoreText}</p>
           </div>
         )}
       </div>
@@ -393,22 +450,28 @@ export default function PracticePage() {
     <div className="practice-view">
       <div className="practice-title-bar">
         <div className="title-info">
-          <h2>Practice Session | <span className="topic">{session.topic}</span></h2>
+          <h2>{ui.practiceSession} | <span className="topic">{session.topic}</span></h2>
           <div className="stats">
-             <span>Progress: {currentQuestionIndex + 1}/{session.questions.length} Questions</span> | <span>Score: {correctCount}/{answers.length} correct</span>
+             <span>{ui.progress}: {currentQuestionIndex + 1}/{session.questions.length} {ui.questions}</span> | <span>{ui.score}: {correctCount}/{answers.length} {ui.correct}</span>
           </div>
         </div>
         <div className="progress-container">
           <div className="progress-bar" style={{ width: `${((currentQuestionIndex + 1) / session.questions.length) * 100}%` }}></div>
-          <span className="progress-label">Practice focused on your weakness</span>
+          <span className="progress-label">{ui.weaknessFocus}</span>
         </div>
+        <button
+          className="btn btn-outline practice-lang-toggle"
+          onClick={() => setUiLanguage(isTurkish ? 'en' : 'tr')}
+        >
+          {ui.languageToggle}
+        </button>
       </div>
 
       <div className="practice-content-grid">
         <div className="question-area card">
           <div className="question-content-box">
             <div className="question-header">
-              <h3>Question {currentQuestionIndex + 1}: {currentQuestion?.difficulty || 'General Knowledge'}</h3>
+              <h3>{ui.question} {currentQuestionIndex + 1}: {currentQuestion?.difficulty || ui.generalKnowledge}</h3>
               <div className="question-text" style={{ fontSize: '20px', lineHeight: '1.6', marginTop: '12px' }}>
                 <MathText text={currentQuestion?.text || currentQuestion?.questionText || ''} />
               </div>
@@ -427,10 +490,10 @@ export default function PracticePage() {
                 <input type="radio" checked={selectedOption === i} onChange={() => setSelectedOption(i)} />
                 <span className="option-text"><MathText text={opt} /></span>
                 {selectedOption === i && !showAnswer && (
-                  <button className="btn-small" onClick={handleCheckAnswer}>Check Answer</button>
+                  <button className="btn-small" onClick={handleCheckAnswer}>{ui.checkAnswer}</button>
                 )}
                 {showAnswer && i === currentQuestion.correctAnswer && (
-                   <span style={{ color: '#00ff00', fontWeight: 'bold', marginLeft: 'auto' }}>✓ Correct</span>
+                   <span style={{ color: '#00ff00', fontWeight: 'bold', marginLeft: 'auto' }}>{ui.correctLabel}</span>
                 )}
               </label>
             ))}
@@ -438,7 +501,7 @@ export default function PracticePage() {
 
           {showAnswer && (
             <div className="explanation-box" style={{ marginTop: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <strong style={{ color: '#fff' }}>Explanation:</strong>
+              <strong style={{ color: '#fff' }}>{ui.explanation}</strong>
               <p style={{ marginTop: '8px', fontSize: '14px', color: '#ccc' }}>
                 <MathText text={currentQuestion?.explanation || ''} />
               </p>
@@ -449,14 +512,14 @@ export default function PracticePage() {
         <aside className="ai-coach-sidebar">
           <div className="coach-card card">
              <div className="card-header">
-               🤖 <strong>AI Coach</strong>
+               🤖 <strong>{ui.coach}</strong>
                {isAnalyzing && <div className="mini-loader"></div>}
              </div>
              <div className="card-body">
-               <p>{coachData?.coachMessage || "Answer questions to get personalized feedback!"}</p>
+               <p>{coachData?.coachMessage || ui.coachPlaceholder}</p>
                {coachData && coachData.knowledgeGaps.length > 0 && (
                  <div className="gaps" style={{ marginTop: '16px' }}>
-                   <strong>Focused Areas:</strong>
+                   <strong>{ui.focusedAreas}</strong>
                    <ul style={{ fontSize: '12px', color: '#888', paddingLeft: '16px', marginTop: '4px' }}>
                      {coachData.knowledgeGaps.map((gap, idx) => <li key={idx}>{gap}</li>)}
                    </ul>
@@ -468,24 +531,25 @@ export default function PracticePage() {
       </div>
 
       <div className="practice-footer">
-        <button className="btn btn-outline" onClick={() => window.location.href = '/'}>End Session</button>
+        <button className="btn btn-outline" onClick={() => window.location.href = '/'}>{ui.endSession}</button>
         <div className="nav-buttons">
-          <button className="btn btn-outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>Previous</button>
+          <button className="btn btn-outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>{ui.previous}</button>
           <button className="btn btn-primary highlighted" onClick={handleNext} disabled={!showAnswer}>
-            {currentQuestionIndex === session.questions.length - 1 ? 'Calculate Score' : 'Next Question'}
+            {currentQuestionIndex === session.questions.length - 1 ? ui.calculateScore : ui.nextQuestion}
           </button>
         </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .practice-view { display: flex; flex-direction: column; gap: 24px; color: white; animation: fadeIn 0.5s ease; }
+        .practice-view { display: flex; flex-direction: column; gap: 24px; color: white; animation: fadeIn 0.5s ease; width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 48px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .practice-title-bar { display: flex; align-items: center; justify-content: space-between; padding: 24px; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); }
-        .progress-container { flex: 1; margin: 0 40px; }
+        .practice-title-bar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); }
+        .progress-container { flex: 1; margin: 0 12px; min-width: 220px; }
         .progress-bar { height: 8px; background: #6a1b2b; border-radius: 4px; transition: width 0.3s ease; }
         .progress-label { font-size: 11px; color: #888; display: block; text-align: center; margin-top: 8px; }
         .practice-content-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
         .card { background: rgba(255,255,255,0.03); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 32px; }
+        .practice-lang-toggle { white-space: nowrap; }
         .option-item { display: flex; align-items: center; padding: 20px; border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; cursor: pointer; margin-bottom: 12px; transition: 0.2s; }
         .option-item.selected { border-color: white; background: rgba(255,255,255,0.05); }
         .option-text { margin-left: 16px; flex: 1; font-weight: 500; }
@@ -496,6 +560,24 @@ export default function PracticePage() {
         .btn-primary.highlighted { background: #6a1b2b; color: white; box-shadow: 0 4px 15px rgba(106, 27, 43, 0.4); }
         .mini-loader { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite; }
         .loader { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #6a1b2b; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        .nav-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+        @media (max-width: 980px) {
+          .practice-view { width: min(100vw - 24px, 100%); padding: 20px 0 40px; gap: 20px; }
+          .practice-title-bar { flex-direction: column; align-items: stretch; }
+          .progress-container { margin: 0; }
+          .practice-lang-toggle { width: 100%; }
+          .practice-content-grid { grid-template-columns: 1fr; }
+          .practice-footer { flex-direction: column; gap: 16px; }
+        }
+        @media (max-width: 640px) {
+          .card { padding: 20px; border-radius: 16px; }
+          .practice-title-bar { padding: 20px; }
+          .practice-footer { padding: 20px; }
+          .option-item { padding: 16px; flex-wrap: wrap; gap: 10px; }
+          .option-text { margin-left: 10px; min-width: 0; }
+          .btn, .btn-small { width: 100%; }
+          .nav-buttons { width: 100%; }
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       ` }} />
     </div>
