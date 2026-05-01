@@ -473,7 +473,7 @@ export default function PracticePage() {
             <div className="question-header">
               <h3>{ui.question} {currentQuestionIndex + 1}: {currentQuestion?.difficulty || ui.generalKnowledge}</h3>
               <div className="question-text" style={{ fontSize: '20px', lineHeight: '1.6', marginTop: '12px' }}>
-                <MathText text={currentQuestion?.text || currentQuestion?.questionText || ''} />
+                <MathText text={isTurkish ? (currentQuestion?.text_tr || currentQuestion?.text || currentQuestion?.questionText || '') : (currentQuestion?.text_en || currentQuestion?.text || currentQuestion?.questionText || '')} />
               </div>
             </div>
 
@@ -485,7 +485,7 @@ export default function PracticePage() {
           </div>
 
           <div className="options-list">
-            {currentQuestion?.options.map((opt, i) => (
+            {(isTurkish ? (currentQuestion?.options_tr || currentQuestion?.options) : (currentQuestion?.options_en || currentQuestion?.options)).map((opt, i) => (
               <label key={i} className={`option-item ${selectedOption === i ? 'selected' : ''}`}>
                 <input type="radio" checked={selectedOption === i} onChange={() => setSelectedOption(i)} />
                 <span className="option-text"><MathText text={opt} /></span>
@@ -503,7 +503,7 @@ export default function PracticePage() {
             <div className="explanation-box" style={{ marginTop: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <strong style={{ color: '#fff' }}>{ui.explanation}</strong>
               <p style={{ marginTop: '8px', fontSize: '14px', color: '#ccc' }}>
-                <MathText text={currentQuestion?.explanation || ''} />
+                <MathText text={isTurkish ? (currentQuestion?.explanation_tr || currentQuestion?.explanation || '') : (currentQuestion?.explanation_en || currentQuestion?.explanation || '')} />
               </p>
             </div>
           )}
@@ -516,12 +516,12 @@ export default function PracticePage() {
                {isAnalyzing && <div className="mini-loader"></div>}
              </div>
              <div className="card-body">
-               <p>{coachData?.coachMessage || ui.coachPlaceholder}</p>
-               {coachData && coachData.knowledgeGaps.length > 0 && (
+               <p>{isTurkish ? (coachData?.coachMessage_tr || coachData?.coachMessage || ui.coachPlaceholder) : (coachData?.coachMessage_en || coachData?.coachMessage || ui.coachPlaceholder)}</p>
+               {coachData && (isTurkish ? coachData.knowledgeGaps_tr : coachData.knowledgeGaps_en || coachData.knowledgeGaps)?.length > 0 && (
                  <div className="gaps" style={{ marginTop: '16px' }}>
                    <strong>{ui.focusedAreas}</strong>
                    <ul style={{ fontSize: '12px', color: '#888', paddingLeft: '16px', marginTop: '4px' }}>
-                     {coachData.knowledgeGaps.map((gap, idx) => <li key={idx}>{gap}</li>)}
+                     {(isTurkish ? coachData.knowledgeGaps_tr : coachData.knowledgeGaps_en || coachData.knowledgeGaps).map((gap: string, idx: number) => <li key={idx}>{gap}</li>)}
                    </ul>
                  </div>
                )}

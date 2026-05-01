@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import pdfParse from 'pdf-parse';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Types
@@ -14,21 +15,32 @@ type Subject =
   | 'turkish'
   | 'default';
 
+interface ResourceItem {
+  title?: string;
+  summary?: string;
+  url?: string;
+  value?: string;
+}
+
 interface QuizRequestBody {
+  accessToken?: string;
   topic: string;        // lecture topic title  e.g. "Fractions, Decimals, and Percentages"
   courseName?: string;  // course name          e.g. "Math 101 (trh121)"
   courseCode?: string;  // course code          e.g. "MATH101"
   courseLanguage?: string;
-  resources?: unknown;
+  resources?: ResourceItem[];
   weakPoints?: string;
 }
 
 interface GeneratedQuestion {
   id: string;
-  text: string;
-  options: string[];
+  text_en: string;
+  text_tr: string;
+  options_en: string[];
+  options_tr: string[];
   correctAnswer: number;
-  explanation: string;
+  explanation_en: string;
+  explanation_tr: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   visual?: {
     type: 'formula' | 'graph' | 'image' | 'text';
@@ -125,12 +137,13 @@ function normalizeOutputLanguage(courseLanguage = ''): string {
 }
 
 function buildLanguageInstruction(courseLanguage: string): string {
-  const outputLanguage = normalizeOutputLanguage(courseLanguage);
   return `
-LANGUAGE REQUIREMENT:
-- All question stems, options, explanations, and reading passages must be entirely in ${outputLanguage}.
-- Do not mix languages unless a proper noun or official course code requires it.
-- If the source materials are mixed-language, still produce the final quiz only in ${outputLanguage}.`.trim();
+BILINGUAL REQUIREMENT:
+- You MUST provide every question, option, and explanation in BOTH English and Turkish.
+- Use the specific keys: "text_en", "text_tr", "options_en", "options_tr", "explanation_en", "explanation_tr".
+- The meaning must be identical in both languages.
+- IMPORTANT: If the user is viewing the English version, "text_en" will be shown. If the Turkish version, "text_tr" will be shown. Both MUST be high quality.
+- Do not let the language of the "RESOURCE CONTENT" influence the output language keys; always fill both "en" and "tr" correctly.`.trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,14 +152,23 @@ LANGUAGE REQUIREMENT:
 
 const JSON_SCHEMA = `
 OUTPUT RULES:
-- Output ONLY valid JSON — no markdown fences, no text before or after.
+- Output ONLY valid JSON.
 - Return EXACTLY one top-level JSON object with exactly one key: "questions".
-- Do not include comments, trailing commas, code fences, analysis, notes, or explanation outside JSON.
-- Exactly 5 questions, never truncate.
-- Every question: id, text, options (4 strings), correctAnswer (0-3), explanation, difficulty ("beginner"|"intermediate"|"advanced").
-- "visual" is optional — include when genuinely useful.
-- Every string value must be valid JSON string content with escaped quotes when needed.
-- Never leave placeholders like "[...]", "(rest omitted)", "same as above", or unfinished arrays/objects.
+- Exactly 5 questions.
+- Every question MUST follow this structure:
+{
+  "id": "string",
+  "text_en": "Question text in English",
+  "text_tr": "Soru metni Türkçe",
+  "options_en": ["Option 1", "Option 2", "Option 3", "Option 4"],
+  "options_tr": ["Seçenek 1", "Seçenek 2", "Seçenek 3", "Seçenek 4"],
+  "correctAnswer": 0,
+  "explanation_en": "Explanation in English",
+  "explanation_tr": "Türkçe açıklama",
+  "difficulty": "beginner|intermediate|advanced"
+}
+- All strings must be valid JSON content.
+- Ensure meanings are identical in both languages.
 
 QUESTION VARIETY:
 - At least 1 question MUST be a real-world word problem (a scenario the student can relate to).
@@ -344,8 +366,13 @@ ${buildLanguageInstruction(courseLanguage)}
 ${JSON_SCHEMA}`;
 }
 
-function buildTurkishPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string): string {
-  return `Sen bir üniversite Türk dili ve edebiyatı profesörüsün.
+function buildTurkishPrompt(topic: string, weakPoints: string, resources: unknown, courseName: string, courseLanguage: string): string {
+  const outputLanguage = normalizeOutputLanguage(courseLanguage);
+  const isEnglish = outputLanguage === 'English';
+
+  return isEnglish 
+    ? buildDefaultPrompt(topic, weakPoints, resources, courseName, courseLanguage)
+    : `Sen bir üniversite Türk dili ve edebiyatı profesörüsün.
 Ders: ${courseName}
 Konu: ${topic}
 Öğrenci Zayıflıkları: ${weakPoints}
@@ -364,6 +391,8 @@ KURALLAR:
 - Zorluk dağılımı: 1 dil bilgisi, 1 yazım/noktalama, 1 metin analizi, 1 edebi dönem/yazar, 1 ileri anlama.
 - Açıklama: kural + örnek; edebi sorularda tarihsel/edebi bağlam ekle.
 - "visual" alanı kullanma, grafik veya çizelge ekleme — bu bir dil/edebiyat dersi.
+
+${buildLanguageInstruction(courseLanguage)}
 
 ${JSON_SCHEMA}`;
 }
@@ -391,6 +420,91 @@ ${JSON_SCHEMA}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  PDF content extraction
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BACKEND_API_URL =
+  process.env.PRACTICE_BACKEND_API_URL?.trim() || 'https://backend.profdux.com/api';
+
+const MAX_CONTENT_CHARS = 10000; // Total character limit for all PDF content combined
+
+async function downloadAndExtractPdf(pdfPath: string, accessToken?: string): Promise<string> {
+  const cleanPath = pdfPath.replace(/^uploads\//, '');
+  const url = `${BACKEND_API_URL}/uploads/${encodeURIComponent(cleanPath)}`;
+  const headers: Record<string, string> = { 'Accept': 'application/pdf' };
+  if (accessToken) headers['Authorization'] = accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) return '';
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  try {
+    const parsed = await pdfParse(buffer);
+    return parsed.text?.trim() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+async function downloadImageAsBase64(imagePath: string, accessToken?: string): Promise<{ mimeType: string, data: string } | null> {
+  const cleanPath = imagePath.replace(/^uploads\//, '');
+  const url = `${BACKEND_API_URL}/uploads/${encodeURIComponent(cleanPath)}`;
+  
+  const headers: Record<string, string> = {};
+  if (accessToken) headers['Authorization'] = accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) return null;
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const arrayBuffer = await response.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+  return { mimeType: contentType, data: base64 };
+}
+
+interface ExtractionResult {
+  text: string;
+  imageParts: any[];
+}
+
+async function extractAllResourceContent(resources: ResourceItem[], accessToken?: string): Promise<ExtractionResult> {
+  const result: ExtractionResult = { text: '', imageParts: [] };
+  if (!resources || resources.length === 0) return result;
+
+  const pdfResources = resources.filter(r => r.value && r.value.toLowerCase().includes('.pdf'));
+  const imageResources = resources.filter(r => r.value && /\.(png|jpe?g|webp)$/i.test(r.value));
+
+  // Handle PDFs
+  if (pdfResources.length > 0) {
+    const perResourceLimit = Math.floor(MAX_CONTENT_CHARS / pdfResources.length);
+    const extractedTexts: string[] = [];
+    for (const resource of pdfResources) {
+      const text = await downloadAndExtractPdf(resource.value!, accessToken);
+      if (text) extractedTexts.push(`--- ${resource.title || 'Resource'} ---\n${text.substring(0, perResourceLimit)}`);
+    }
+    result.text = extractedTexts.join('\n\n');
+  }
+
+  // Handle Images (Multimodal)
+  for (const resource of imageResources) {
+    const imgData = await downloadImageAsBase64(resource.value!, accessToken);
+    if (imgData) {
+      result.imageParts.push({
+        inline_data: {
+          mime_type: imgData.mimeType,
+          data: imgData.data
+        }
+      });
+    }
+  }
+
+  console.log(`[QUIZ] Resources: ${result.text.length} chars text, ${result.imageParts.length} images`);
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Prompt router
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -401,19 +515,29 @@ function buildPrompt(
   courseName: string,
   courseCode: string,
   courseLanguage: string,
+  resourceContent: string,
 ): string {
   const subject = detectSubject(topic, courseName, courseCode);
   const wp = weakPoints || 'None provided';
+
+  // Build the content block that gets appended to every prompt
+  const contentBlock = resourceContent
+    ? `\n\nRESOURCE CONTENT (use this as the PRIMARY source for generating questions):\n${resourceContent}`
+    : '';
+
+  let basePrompt: string;
   switch (subject) {
-    case 'math': return buildMathPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'physics': return buildPhysicsPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'chemistry': return buildChemistryPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'biology': return buildBiologyPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'history': return buildHistoryPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'english': return buildEnglishPrompt(topic, wp, resources, courseName, courseLanguage);
-    case 'turkish': return buildTurkishPrompt(topic, wp, resources, courseName);
-    default: return buildDefaultPrompt(topic, wp, resources, courseName, courseLanguage);
+    case 'math': basePrompt = buildMathPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'physics': basePrompt = buildPhysicsPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'chemistry': basePrompt = buildChemistryPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'biology': basePrompt = buildBiologyPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'history': basePrompt = buildHistoryPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'english': basePrompt = buildEnglishPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    case 'turkish': basePrompt = buildTurkishPrompt(topic, wp, resources, courseName, courseLanguage); break;
+    default: basePrompt = buildDefaultPrompt(topic, wp, resources, courseName, courseLanguage);
   }
+
+  return basePrompt + contentBlock;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -539,23 +663,20 @@ function normalizeQuestion(question: unknown, index: number): GeneratedQuestion 
   }
 
   const candidate = question as Record<string, unknown>;
-  const text =
-    typeof candidate.text === 'string'
-      ? candidate.text
-      : typeof candidate.questionText === 'string'
-        ? candidate.questionText
-        : '';
-  const explanation =
-    typeof candidate.explanation === 'string' ? candidate.explanation : '';
-  const options = Array.isArray(candidate.options)
-    ? candidate.options.filter((item): item is string => typeof item === 'string')
-    : [];
+  
+  const text_en = typeof candidate.text_en === 'string' ? candidate.text_en : (typeof candidate.text === 'string' ? candidate.text : '');
+  const text_tr = typeof candidate.text_tr === 'string' ? candidate.text_tr : (typeof candidate.text === 'string' ? candidate.text : '');
+  
+  const explanation_en = typeof candidate.explanation_en === 'string' ? candidate.explanation_en : (typeof candidate.explanation === 'string' ? candidate.explanation : '');
+  const explanation_tr = typeof candidate.explanation_tr === 'string' ? candidate.explanation_tr : (typeof candidate.explanation === 'string' ? candidate.explanation : '');
 
-  if (!text || !explanation || options.length < 4) {
+  const options_en = Array.isArray(candidate.options_en) ? candidate.options_en.map(String) : (Array.isArray(candidate.options) ? candidate.options.map(String) : []);
+  const options_tr = Array.isArray(candidate.options_tr) ? candidate.options_tr.map(String) : (Array.isArray(candidate.options) ? candidate.options.map(String) : []);
+
+  if (!text_en || !text_tr || options_en.length < 4 || options_tr.length < 4) {
     return null;
   }
 
-  const normalizedOptions = options.slice(0, 4);
   const difficulty =
     candidate.difficulty === 'beginner' ||
     candidate.difficulty === 'intermediate' ||
@@ -566,7 +687,7 @@ function normalizeQuestion(question: unknown, index: number): GeneratedQuestion 
   const rawCorrectAnswer =
     typeof candidate.correctAnswer === 'number' ? candidate.correctAnswer : 0;
   const correctAnswer =
-    rawCorrectAnswer >= 0 && rawCorrectAnswer < normalizedOptions.length
+    rawCorrectAnswer >= 0 && rawCorrectAnswer < options_en.length
       ? rawCorrectAnswer
       : 0;
 
@@ -590,10 +711,13 @@ function normalizeQuestion(question: unknown, index: number): GeneratedQuestion 
       typeof candidate.id === 'string' && candidate.id.trim().length > 0
         ? candidate.id
         : `q${index + 1}`,
-    text,
-    options: normalizedOptions,
+    text_en,
+    text_tr,
+    options_en: options_en.slice(0, 4),
+    options_tr: options_tr.slice(0, 4),
     correctAnswer,
-    explanation,
+    explanation_en,
+    explanation_tr,
     difficulty,
     ...(visual ? { visual } : {}),
   };
@@ -663,6 +787,7 @@ export async function POST(request: Request) {
   try {
     const body: QuizRequestBody = await request.json();
     const {
+      accessToken,
       topic,
       courseName = '',
       courseCode = '',
@@ -678,18 +803,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ questions: getMockQuestions(topic, courseName, courseCode, courseLanguage) });
     }
 
+    // Extract content (Text + Images)
+    const resourceItems = Array.isArray(resources) ? resources as ResourceItem[] : [];
+    let extraction: ExtractionResult = { text: '', imageParts: [] };
+    try {
+      extraction = await extractAllResourceContent(resourceItems, accessToken);
+    } catch (e) {
+      console.warn('[QUIZ] Extraction failed:', e);
+    }
+
     const detectedSubject = detectSubject(topic, courseName, courseCode);
-    const prompt = buildPrompt(topic, weakPoints, resources, courseName, courseCode, courseLanguage);
+    const prompt = buildPrompt(topic, weakPoints, resources, courseName, courseCode, courseLanguage, extraction.text);
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
 
-    console.log(`[GEMINI] Subject: "${detectedSubject}" | Course: "${courseName}" | Topic: "${topic}" | Language: "${normalizeOutputLanguage(courseLanguage)}"`);
+    // Construct multimodal request
+    const contents = [{
+      parts: [
+        { text: prompt },
+        ...extraction.imageParts
+      ]
+    }];
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents,
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.7,

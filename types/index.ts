@@ -37,9 +37,15 @@ export interface QuizQuestion {
   lectureId?: string;
   text?: string;
   questionText?: string;
+  text_en?: string;
+  text_tr?: string;
   options: string[];
+  options_en?: string[];
+  options_tr?: string[];
   correctAnswer: number;
   explanation: string;
+  explanation_en?: string;
+  explanation_tr?: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   visual?: {
     type: 'formula' | 'graph' | 'image' | 'text';

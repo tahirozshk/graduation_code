@@ -22,14 +22,16 @@ export async function POST(request: Request) {
     - Reference Resources (Summaries): ${JSON.stringify(resources)}
     
     Tasks:
-    1. Provide a concise, encouraging "coachMessage".
-    2. Identify specific "knowledgeGaps" (concepts the student struggled with).
+    1. Provide a concise, encouraging "coachMessage" in BOTH English and Turkish.
+    2. Identify specific "knowledgeGaps" (concepts the student struggled with) in BOTH English and Turkish.
     3. Calculate a "score" out of 100 based on their accuracy.
     
     Output ONLY valid JSON matching this structure:
     {
-      "coachMessage": "string",
-      "knowledgeGaps": ["string"],
+      "coachMessage_en": "string",
+      "coachMessage_tr": "string",
+      "knowledgeGaps_en": ["string"],
+      "knowledgeGaps_tr": ["string"],
       "score": number
     }`;
 

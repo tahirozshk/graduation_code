@@ -143,7 +143,7 @@ export const PracticeEngine = {
         const targetLectureId =
             selectedLectureId || weakestMark?.lectureId || "unknown";
         const targetLecture = safeLectures.find(
-            (l) => l.id === targetLectureId,
+            (l) => String(l.id) === String(targetLectureId),
         ) ||
             safeLectures[0] || {
                 id: targetLectureId,
@@ -253,7 +253,9 @@ export const PracticeEngine = {
         resources: any[];
     }): Promise<any[]> {
         try {
+            const accessToken = DuxApiService instanceof Object ? (await import('./auth-bridge')).getStoredAccessToken() : null;
             const payload = {
+                accessToken,
                 // Use title as the primary topic signal — it's always populated
                 topic:
                     targetLecture.title ||
@@ -271,6 +273,8 @@ export const PracticeEngine = {
                     summary:
                         r.summary ||
                         `Focus on the topic: ${targetLecture.title}`,
+                    url: r.url || null,
+                    value: r.value || null,
                 })),
             };
 

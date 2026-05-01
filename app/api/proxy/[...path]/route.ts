@@ -23,7 +23,17 @@ async function handleProxy(request: Request, pathArray: string[]) {
   console.log(`[PROXY REQUEST] ${request.method} -> ${finalUrl}`);
 
   const headers = new Headers(request.headers);
-  const auth = headers.get('Authorization');
+  let auth = headers.get('Authorization');
+
+  // If no auth header, check for token in query params (useful for direct link clicks like PDFs)
+  if (!auth) {
+    const queryToken = searchParams.get('token');
+    if (queryToken) {
+      auth = queryToken.startsWith('Bearer ') ? queryToken : `Bearer ${queryToken}`;
+      headers.set('Authorization', auth);
+    }
+  }
+
   console.log(`[PROXY AUTH] Token Present: ${auth ? 'YES (' + auth.substring(0, 20) + '...)' : 'NO'}`);
   
   try {

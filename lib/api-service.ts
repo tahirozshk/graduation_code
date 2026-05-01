@@ -90,10 +90,11 @@ export const DuxApiService = {
       if (!res.ok) throw new Error('Failed to fetch resources');
       const data = await res.json();
       const resources = data.resources || [];
+      const accessToken = getStoredAccessToken();
       return resources.map((r: any) => ({
         id: r.resourceId,
         title: r.title,
-        url: r.value ? `${API_CONFIG.BASE_URL}/uploads/${r.value.replace('uploads/', '')}` : '#',
+        url: r.value ? `${API_CONFIG.BASE_URL}/uploads/${r.value.replace('uploads/', '')}${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ''}` : '#',
         ...r
       }));
     } catch (error) {

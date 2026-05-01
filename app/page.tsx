@@ -284,7 +284,7 @@ export default function CoursePage() {
           </div>
 
           <div className="course-header" style={{ marginTop: '32px' }}>
-            <h2 className="course-title" style={{ color: '#fff', fontSize: '40px', fontWeight: '800' }}>{selectedCourse?.title} ({selectedCourse?.id.toString().includes('math') ? 'mth101' : 'trh121'})</h2>
+            <h2 className="course-title" style={{ color: '#fff', fontSize: '40px', fontWeight: '800' }}>{selectedCourse?.title}{selectedCourse?.code ? ` (${selectedCourse.code.toLowerCase()})` : ''}</h2>
           </div>
 
           <div className="info-card">
